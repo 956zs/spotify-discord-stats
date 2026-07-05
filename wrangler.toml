@@ -9,7 +9,7 @@ routes = [
 ]
 
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["*/10 * * * *"]
 
 [vars]
 DISCORD_CLIENT_ID = "1523243855988658256"

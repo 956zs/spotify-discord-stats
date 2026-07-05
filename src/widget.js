@@ -9,7 +9,7 @@ export function buildWidgetPayload(stats) {
   const dynamic = [
     field(fields.topHeroTitle, widgetConfig.topHeroTitle),
     field(fields.during, formatDateRange(stats.since)),
-    field(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()}`),
+    field(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()} (UTC +8)`),
     field(fields.mainTitle, `${widgetConfig.mainTitle} ${stats.songsPlayed}`),
     field(fields.songsPlayed, String(stats.songsPlayed)),
     field(fields.listeningTime, formatMinutes(stats.listeningMs)),

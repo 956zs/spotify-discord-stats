@@ -135,7 +135,7 @@ listening time with track duration.
 
 Runtime behavior lives in [config/app.json](config/app.json):
 
-- `syncIntervalSeconds`: API sync interval. Default is 900 seconds.
+- `syncIntervalSeconds`: API sync interval. Default is 600 seconds.
 - `statsDays`: stats window. Default is 28 days.
 - `patchDiscordOnSync`: PATCH Discord after each sync.
 - `patchOnlyWhenChanged`: avoid PATCHing identical widget payloads.

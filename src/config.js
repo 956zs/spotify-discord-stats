@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const projectRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 
 const defaultAppConfig = {
-  syncIntervalSeconds: 900,
+  syncIntervalSeconds: 600,
   statsDays: 28,
   patchDiscordOnSync: true,
   patchOnlyWhenChanged: true,

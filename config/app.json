@@ -1,5 +1,5 @@
 {
-  "syncIntervalSeconds": 900,
+  "syncIntervalSeconds": 600,
   "statsDays": 28,
   "patchDiscordOnSync": true,
   "patchOnlyWhenChanged": true,

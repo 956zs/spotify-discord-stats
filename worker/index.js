@@ -432,7 +432,7 @@ function buildWidgetPayload(stats) {
   const dynamic = [
     widgetField(fields.topHeroTitle, widgetConfig.topHeroTitle),
     widgetField(fields.during, formatDateRange(stats.since)),
-    widgetField(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()}`),
+    widgetField(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()} (UTC +8)`),
     widgetField(fields.mainTitle, `${widgetConfig.mainTitle} ${stats.songsPlayed}`),
     widgetField(fields.songsPlayed, String(stats.songsPlayed)),
     widgetField(fields.listeningTime, formatMinutes(stats.listeningMs)),

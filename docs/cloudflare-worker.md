@@ -2,7 +2,7 @@
 
 This deploys the Spotify stats service to Cloudflare Workers:
 
-- Worker Cron syncs Spotify Recently Played every 15 minutes.
+- Worker Cron syncs Spotify Recently Played every 10 minutes.
 - D1 stores plays, artists, OAuth state, and refresh tokens.
 - Worker routes handle Spotify OAuth callback and admin actions.
 - Discord widget PATCH and reauthorization DMs use Discord REST API.
