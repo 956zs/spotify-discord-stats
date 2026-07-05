@@ -1,0 +1,23 @@
+{
+  "name": "spotify-discord-stats",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "spotify:auth-url": "node src/spotify-auth-url.js",
+    "spotify:token": "node src/spotify-token.js",
+    "spotify:sync": "node src/worker.js --once",
+    "spotify:import": "node src/import-history.js",
+    "worker": "node src/worker.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.26.2"
+  },
+  "overrides": {
+    "undici": "6.27.0"
+  }
+}
