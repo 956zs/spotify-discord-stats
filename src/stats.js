@@ -14,6 +14,6 @@ export function formatStats(stats) {
     `Unique songs: ${stats.uniqueSongs}`,
     `Different artists: ${stats.differentArtists}`,
     `Different albums: ${stats.differentAlbums}`,
-    `Most listened genre: ${stats.mostListenedGenre}`
+    `Top album: ${stats.topAlbum}`
   ].join('\n');
 }

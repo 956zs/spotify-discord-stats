@@ -152,6 +152,6 @@ The field names must match the Discord widget editor `Data Field` names:
 - `Unique_Songs`
 - `Different_Artists`
 - `Different_Albums`
-- `Most_Listened_Genre`
+- `Top_Album`
 
 Change them in `config/widget.json` if your widget uses different names.

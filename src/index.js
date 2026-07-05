@@ -32,7 +32,8 @@ function startBackgroundSync() {
       console.log('Sync complete:', {
         fetched: result.recentlyPlayed.fetched,
         inserted: result.recentlyPlayed.inserted,
-        genresUpdated: result.genres.updated,
+        genreSyncSkipped: result.genres.skipped,
+        genreSyncReason: result.genres.reason,
         discordPatched: result.discord.patched,
         discordSkipped: result.discord.skipped
       });

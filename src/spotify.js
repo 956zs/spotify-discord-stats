@@ -1,9 +1,7 @@
 import { env, requiredEnv } from './env.js';
 import {
   getState,
-  getUncachedSpotifyArtistIds,
   setState,
-  updateArtistGenres,
   upsertSpotifyPlay
 } from './db.js';
 
@@ -150,32 +148,6 @@ export async function syncRecentlyPlayed() {
   }
 
   return { fetched: items.length, inserted };
-}
-
-export async function refreshMissingArtistGenres(maxBatches = 3) {
-  const accessToken = await refreshSpotifyAccessToken();
-  let updated = 0;
-
-  for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
-    const rows = getUncachedSpotifyArtistIds(50);
-    if (rows.length === 0) {
-      break;
-    }
-
-    const ids = rows.map((row) => row.artist_id).filter(Boolean);
-    const url = new URL(`${API_URL}/artists`);
-    url.searchParams.set('ids', ids.join(','));
-    const response = await spotifyApiFetch(url, accessToken);
-
-    for (const artist of response.artists ?? []) {
-      if (artist?.id) {
-        updateArtistGenres(artist);
-        updated += 1;
-      }
-    }
-  }
-
-  return { updated };
 }
 
 async function spotifyApiFetch(url, accessToken) {

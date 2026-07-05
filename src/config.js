@@ -30,7 +30,7 @@ const defaultWidgetConfig = {
     uniqueSongs: 'Unique_Songs',
     differentArtists: 'Different_Artists',
     differentAlbums: 'Different_Albums',
-    mostListenedGenre: 'Most_Listened_Genre'
+    topAlbum: 'Top_Album'
   }
 };
 

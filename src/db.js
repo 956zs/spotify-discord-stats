@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { env } from './env.js';
-import { fallbackKey, normalizeKey } from './keys.js';
+import { fallbackKey } from './keys.js';
 import { isoToMs, nowIso, sinceIso } from './time.js';
 
 let database;
@@ -308,44 +308,6 @@ function spotifyIdFromUri(uri) {
   return parts[2] || null;
 }
 
-export function getUncachedSpotifyArtistIds(limit = 50) {
-  return getDb()
-    .prepare(`
-      SELECT artist_key, artist_id
-      FROM artists
-      WHERE artist_id IS NOT NULL
-        AND (genres_cached_at IS NULL OR genres_cached_at < datetime('now', '-30 days'))
-      ORDER BY genres_cached_at IS NOT NULL, artist_name
-      LIMIT ?
-    `)
-    .all(limit);
-}
-
-export function updateArtistGenres(artist) {
-  const artistKey = artist.id;
-  getDb()
-    .prepare(`
-      INSERT INTO artists (
-        artist_key, artist_id, artist_uri, artist_name, genres_json, genres_cached_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(artist_key) DO UPDATE SET
-        artist_id = excluded.artist_id,
-        artist_uri = excluded.artist_uri,
-        artist_name = excluded.artist_name,
-        genres_json = excluded.genres_json,
-        genres_cached_at = excluded.genres_cached_at
-    `)
-    .run(
-      artistKey,
-      artist.id,
-      artist.uri ?? null,
-      artist.name ?? 'Unknown Artist',
-      JSON.stringify(artist.genres ?? []),
-      nowIso()
-    );
-}
-
 export function getStats(days) {
   const since = sinceIso(days);
   const db = getDb();
@@ -369,36 +331,18 @@ export function getStats(days) {
     `)
     .get(since);
 
-  const artistRows = db
+  const topAlbum = db
     .prepare(`
-      SELECT pa.artist_key, a.genres_json
-      FROM play_artists pa
-      LEFT JOIN artists a ON a.artist_key = pa.artist_key
-      WHERE pa.played_at >= ?
+      SELECT album_name, COUNT(*) AS plays
+      FROM plays
+      WHERE played_at >= ?
+        AND album_name IS NOT NULL
+        AND TRIM(album_name) != ''
+      GROUP BY COALESCE(album_key, album_name), album_name
+      ORDER BY plays DESC, album_name COLLATE NOCASE ASC
+      LIMIT 1
     `)
-    .all(since);
-
-  const genreCounts = new Map();
-  for (const row of artistRows) {
-    let genres = [];
-    try {
-      genres = JSON.parse(row.genres_json || '[]');
-    } catch {
-      genres = [];
-    }
-
-    for (const genre of genres) {
-      const key = normalizeKey(genre);
-      if (key) {
-        genreCounts.set(key, (genreCounts.get(key) ?? 0) + 1);
-      }
-    }
-  }
-
-  const [mostListenedGenre] = [...genreCounts.entries()].sort((a, b) => b[1] - a[1])[0] ?? [
-    'unknown',
-    0
-  ];
+    .get(since);
 
   return {
     days,
@@ -408,7 +352,8 @@ export function getStats(days) {
     uniqueSongs: Number(summary.unique_songs ?? 0),
     differentArtists: Number(artistSummary.different_artists ?? 0),
     differentAlbums: Number(summary.different_albums ?? 0),
-    mostListenedGenre
+    topAlbum: topAlbum?.album_name ?? 'unknown',
+    topAlbumPlays: Number(topAlbum?.plays ?? 0)
   };
 }
 

@@ -3,7 +3,7 @@
 This deploys the Spotify stats service to Cloudflare Workers:
 
 - Worker Cron syncs Spotify Recently Played every 15 minutes.
-- D1 stores plays, artists, genres, OAuth state, and refresh tokens.
+- D1 stores plays, artists, OAuth state, and refresh tokens.
 - Worker routes handle Spotify OAuth callback and admin actions.
 - Discord widget PATCH and reauthorization DMs use Discord REST API.
 
@@ -12,6 +12,10 @@ Cloudflare Tunnel and local ports are not needed for this deployment target.
 Discord DMs only work if the bot shares a server with the target Discord user
 and that user allows DMs. If DMs fail, Spotify authorization and sync still
 continue; the Worker logs the failure and skips the notification.
+
+Spotify artist genre enrichment is disabled because Spotify artist genre
+metadata is deprecated and unreliable for new apps. The default widget uses
+`Top_Album` instead.
 
 ## Required Cloudflare Auth
 

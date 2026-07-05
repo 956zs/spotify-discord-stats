@@ -2,21 +2,21 @@ import crypto from 'node:crypto';
 import { appConfig, widgetConfig } from './config.js';
 import { env, requiredEnv } from './env.js';
 import { getState, setState } from './db.js';
-import { formatLocalUpdatedAt, formatMinutes } from './time.js';
+import { formatDateRange, formatLocalUpdatedAt, formatMinutes } from './time.js';
 
 export function buildWidgetPayload(stats) {
   const fields = widgetConfig.fields;
   const dynamic = [
     field(fields.topHeroTitle, widgetConfig.topHeroTitle),
-    field(fields.during, widgetConfig.during),
+    field(fields.during, formatDateRange(stats.since)),
     field(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()}`),
-    field(fields.mainTitle, widgetConfig.mainTitle),
+    field(fields.mainTitle, `${widgetConfig.mainTitle} ${stats.songsPlayed}`),
     field(fields.songsPlayed, String(stats.songsPlayed)),
     field(fields.listeningTime, formatMinutes(stats.listeningMs)),
     field(fields.uniqueSongs, String(stats.uniqueSongs)),
     field(fields.differentArtists, String(stats.differentArtists)),
     field(fields.differentAlbums, String(stats.differentAlbums)),
-    field(fields.mostListenedGenre, stats.mostListenedGenre)
+    field(fields.topAlbum, stats.topAlbum)
   ];
 
   return {

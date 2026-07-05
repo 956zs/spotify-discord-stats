@@ -101,12 +101,7 @@ async function handleSpotifyCallback(url, env) {
 
 async function syncOnce(env, options = {}) {
   const recentlyPlayed = await syncRecentlyPlayed(env);
-  let genres;
-  try {
-    genres = await refreshMissingArtistGenres(env);
-  } catch (error) {
-    genres = { updated: 0, skipped: true, error: error.message };
-  }
+  const genres = { updated: 0, skipped: true, reason: 'top_album_replaces_genre' };
   const stats = await getStats(env.DB, appConfig.statsDays);
 
   let discord = { patched: false, skipped: true, reason: 'disabled' };
@@ -233,40 +228,6 @@ async function syncRecentlyPlayed(env) {
   }
 
   return { fetched: items.length, inserted };
-}
-
-async function refreshMissingArtistGenres(env, maxBatches = 3) {
-  const accessToken = await refreshSpotifyAccessToken(env);
-  let updated = 0;
-
-  for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
-    const rows = await env.DB.prepare(`
-      SELECT artist_key, artist_id
-      FROM artists
-      WHERE artist_id IS NOT NULL
-        AND (genres_cached_at IS NULL OR genres_cached_at < datetime('now', '-30 days'))
-      ORDER BY genres_cached_at IS NOT NULL, artist_name
-      LIMIT 50
-    `).all();
-
-    if (!rows.results.length) {
-      break;
-    }
-
-    const ids = rows.results.map((row) => row.artist_id).filter(Boolean);
-    const url = new URL(`${SPOTIFY_API_URL}/artists`);
-    url.searchParams.set('ids', ids.join(','));
-    const response = await spotifyApiFetch(url, accessToken);
-
-    for (const artist of response.artists ?? []) {
-      if (artist?.id) {
-        await updateArtistGenres(env.DB, artist);
-        updated += 1;
-      }
-    }
-  }
-
-  return { updated };
 }
 
 async function spotifyApiFetch(url, accessToken) {
@@ -415,31 +376,6 @@ async function upsertPlayArtist(db, artist) {
     .run();
 }
 
-async function updateArtistGenres(db, artist) {
-  await db
-    .prepare(`
-      INSERT INTO artists (
-        artist_key, artist_id, artist_uri, artist_name, genres_json, genres_cached_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(artist_key) DO UPDATE SET
-        artist_id = excluded.artist_id,
-        artist_uri = excluded.artist_uri,
-        artist_name = excluded.artist_name,
-        genres_json = excluded.genres_json,
-        genres_cached_at = excluded.genres_cached_at
-    `)
-    .bind(
-      artist.id,
-      artist.id,
-      artist.uri ?? null,
-      artist.name ?? 'Unknown Artist',
-      JSON.stringify(artist.genres ?? []),
-      new Date().toISOString()
-    )
-    .run();
-}
-
 async function getStats(db, days) {
   const since = new Date(Date.now() - days * MS_PER_DAY).toISOString();
   const summary = await db
@@ -464,37 +400,19 @@ async function getStats(db, days) {
     .bind(since)
     .first();
 
-  const artistRows = await db
+  const topAlbum = await db
     .prepare(`
-      SELECT pa.artist_key, a.genres_json
-      FROM play_artists pa
-      LEFT JOIN artists a ON a.artist_key = pa.artist_key
-      WHERE pa.played_at >= ?
+      SELECT album_name, COUNT(*) AS plays
+      FROM plays
+      WHERE played_at >= ?
+        AND album_name IS NOT NULL
+        AND TRIM(album_name) != ''
+      GROUP BY COALESCE(album_key, album_name), album_name
+      ORDER BY plays DESC, album_name COLLATE NOCASE ASC
+      LIMIT 1
     `)
     .bind(since)
-    .all();
-
-  const genreCounts = new Map();
-  for (const row of artistRows.results) {
-    let genres = [];
-    try {
-      genres = JSON.parse(row.genres_json || '[]');
-    } catch {
-      genres = [];
-    }
-
-    for (const genre of genres) {
-      const key = normalizeKey(genre);
-      if (key) {
-        genreCounts.set(key, (genreCounts.get(key) ?? 0) + 1);
-      }
-    }
-  }
-
-  const [mostListenedGenre] = [...genreCounts.entries()].sort((a, b) => b[1] - a[1])[0] ?? [
-    'unknown',
-    0
-  ];
+    .first();
 
   return {
     days,
@@ -504,7 +422,8 @@ async function getStats(db, days) {
     uniqueSongs: Number(summary.unique_songs ?? 0),
     differentArtists: Number(artistSummary.different_artists ?? 0),
     differentAlbums: Number(summary.different_albums ?? 0),
-    mostListenedGenre
+    topAlbum: topAlbum?.album_name ?? 'unknown',
+    topAlbumPlays: Number(topAlbum?.plays ?? 0)
   };
 }
 
@@ -512,15 +431,15 @@ function buildWidgetPayload(stats) {
   const fields = widgetConfig.fields;
   const dynamic = [
     widgetField(fields.topHeroTitle, widgetConfig.topHeroTitle),
-    widgetField(fields.during, widgetConfig.during),
+    widgetField(fields.during, formatDateRange(stats.since)),
     widgetField(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()}`),
-    widgetField(fields.mainTitle, widgetConfig.mainTitle),
+    widgetField(fields.mainTitle, `${widgetConfig.mainTitle} ${stats.songsPlayed}`),
     widgetField(fields.songsPlayed, String(stats.songsPlayed)),
     widgetField(fields.listeningTime, formatMinutes(stats.listeningMs)),
     widgetField(fields.uniqueSongs, String(stats.uniqueSongs)),
     widgetField(fields.differentArtists, String(stats.differentArtists)),
     widgetField(fields.differentAlbums, String(stats.differentAlbums)),
-    widgetField(fields.mostListenedGenre, stats.mostListenedGenre)
+    widgetField(fields.topAlbum, stats.topAlbum)
   ];
 
   return {
@@ -775,6 +694,20 @@ function formatLocalUpdatedAt(date = new Date()) {
     timeZone: 'Asia/Taipei'
   });
   return formatter.format(date);
+}
+
+function formatLocalDate(date) {
+  const formatter = new Intl.DateTimeFormat('zh-TW', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    timeZone: 'Asia/Taipei'
+  });
+  return formatter.format(date);
+}
+
+function formatDateRange(startIso, endDate = new Date()) {
+  return `${formatLocalDate(new Date(startIso))} ~ ${formatLocalDate(endDate)}`;
 }
 
 function normalizeKey(value) {

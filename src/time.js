@@ -29,3 +29,17 @@ export function formatLocalUpdatedAt(date = new Date()) {
   });
   return formatter.format(date);
 }
+
+export function formatLocalDate(date) {
+  const formatter = new Intl.DateTimeFormat('zh-TW', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    timeZone: 'Asia/Taipei'
+  });
+  return formatter.format(date);
+}
+
+export function formatDateRange(startIso, endDate = new Date()) {
+  return `${formatLocalDate(new Date(startIso))} ~ ${formatLocalDate(endDate)}`;
+}
