@@ -1,5 +1,5 @@
 import process from 'node:process';
-import { envInt } from './env.js';
+import { appConfig } from './config.js';
 import { syncOnce } from './sync.js';
 
 const once = process.argv.includes('--once');
@@ -12,7 +12,7 @@ async function run() {
 if (once) {
   await run();
 } else {
-  const intervalSeconds = envInt('SYNC_INTERVAL_SECONDS', 300);
+  const intervalSeconds = appConfig.syncIntervalSeconds;
   await run();
   setInterval(() => {
     run().catch((error) => console.error(error));

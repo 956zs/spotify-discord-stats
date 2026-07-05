@@ -1,0 +1,25 @@
+name = "spotify-discord-stats"
+main = "worker/index.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+account_id = "9bb214292a36a0be42a853528de61a70"
+
+routes = [
+  { pattern = "spotify-stats.mimidlc.me", custom_domain = true }
+]
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+[vars]
+DISCORD_CLIENT_ID = "1523243855988658256"
+DISCORD_USER_ID = "586502118530351114"
+DISCORD_REMINDER_USER_ID = "586502118530351114"
+SPOTIFY_CLIENT_ID = "9963136ea69b45d3a350a2e445a96145"
+SPOTIFY_REDIRECT_URI = "https://spotify-stats.mimidlc.me/spotify/callback"
+PUBLIC_BASE_URL = "https://spotify-stats.mimidlc.me"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "spotify-discord-stats"
+database_id = "c28ae3e2-3916-4f8b-821e-90efd84f1b0f"

@@ -1,9 +1,9 @@
-import { envInt } from './env.js';
+import { appConfig } from './config.js';
 import { getStats } from './db.js';
 import { formatMinutes } from './time.js';
 
 export function getConfiguredStats() {
-  return getStats(envInt('SPOTIFY_STATS_DAYS', 28));
+  return getStats(appConfig.statsDays);
 }
 
 export function formatStats(stats) {

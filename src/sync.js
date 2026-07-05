@@ -1,4 +1,4 @@
-import { envBool } from './env.js';
+import { appConfig } from './config.js';
 import { refreshMissingArtistGenres, syncRecentlyPlayed } from './spotify.js';
 import { getConfiguredStats } from './stats.js';
 import { patchDiscordWidget } from './widget.js';
@@ -9,7 +9,7 @@ export async function syncOnce(options = {}) {
   const stats = getConfiguredStats();
 
   let discord = { patched: false, skipped: true, reason: 'disabled' };
-  if (options.patchDiscord ?? envBool('PATCH_DISCORD_ON_SYNC', true)) {
+  if (options.patchDiscord ?? appConfig.patchDiscordOnSync) {
     discord = await patchDiscordWidget(stats, { force: options.forcePatch });
   }
 

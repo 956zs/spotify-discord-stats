@@ -1,0 +1,9 @@
+{
+  "syncIntervalSeconds": 900,
+  "statsDays": 28,
+  "patchDiscordOnSync": true,
+  "patchOnlyWhenChanged": true,
+  "spotifyRefreshTokenValidDays": 180,
+  "spotifyReauthRemindDays": 30,
+  "reauthReminderIntervalHours": 24
+}

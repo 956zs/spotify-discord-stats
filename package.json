@@ -12,7 +12,13 @@
     "spotify:token": "node src/spotify-token.js",
     "spotify:sync": "node src/worker.js --once",
     "spotify:import": "node src/import-history.js",
-    "worker": "node src/worker.js"
+    "worker": "node src/worker.js",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
+    "cf:d1:create": "wrangler d1 create spotify-discord-stats",
+    "cf:d1:migrate:local": "wrangler d1 migrations apply spotify-discord-stats --local",
+    "cf:d1:migrate:remote": "wrangler d1 migrations apply spotify-discord-stats --remote",
+    "cf:import": "node scripts/import-history-d1.js"
   },
   "dependencies": {
     "discord.js": "^14.26.2"

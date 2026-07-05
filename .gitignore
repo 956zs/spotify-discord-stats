@@ -2,3 +2,7 @@
 data/
 node_modules/
 npm-debug.log*
+.wrangler/
+.wrangler-dry-run/
+.cloudflare-admin-token
+.spotify-login-url

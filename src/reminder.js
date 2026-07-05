@@ -1,4 +1,5 @@
-import { env, envInt } from './env.js';
+import { appConfig } from './config.js';
+import { env } from './env.js';
 import { getState, setState } from './db.js';
 import { getSpotifyLoginUrl } from './oauth-server.js';
 import { getSpotifyRefreshTokenIssuedAt } from './spotify.js';
@@ -6,7 +7,7 @@ import { getSpotifyRefreshTokenIssuedAt } from './spotify.js';
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export function startSpotifyReauthReminder(client) {
-  const intervalHours = envInt('REAUTH_REMINDER_INTERVAL_HOURS', 24);
+  const intervalHours = appConfig.reauthReminderIntervalHours;
   if (intervalHours <= 0) {
     console.log('Spotify reauth reminder disabled.');
     return;
@@ -49,8 +50,8 @@ export async function runSpotifyReauthReminder(client) {
     );
   }
 
-  const validDays = envInt('SPOTIFY_REFRESH_TOKEN_VALID_DAYS', 180);
-  const remindDays = envInt('SPOTIFY_REAUTH_REMIND_DAYS', 30);
+  const validDays = appConfig.spotifyRefreshTokenValidDays;
+  const remindDays = appConfig.spotifyReauthRemindDays;
   const expiresAt = new Date(issuedAt.getTime() + validDays * MS_PER_DAY);
   const daysLeft = Math.ceil((expiresAt.getTime() - Date.now()) / MS_PER_DAY);
 

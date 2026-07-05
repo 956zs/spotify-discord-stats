@@ -1,31 +1,34 @@
 import crypto from 'node:crypto';
-import { env, envBool, requiredEnv } from './env.js';
+import { appConfig, widgetConfig } from './config.js';
+import { env, requiredEnv } from './env.js';
 import { getState, setState } from './db.js';
 import { formatLocalUpdatedAt, formatMinutes } from './time.js';
 
 export function buildWidgetPayload(stats) {
+  const fields = widgetConfig.fields;
   const dynamic = [
-    field(env('WIDGET_FIELD_MAIN_TITLE', 'main_title'), env('WIDGET_MAIN_TITLE', 'Last 4 Weeks Played:')),
-    field(env('WIDGET_FIELD_SONGS_PLAYED', 'Songs_Played'), String(stats.songsPlayed)),
-    field(env('WIDGET_FIELD_LISTENING_TIME', 'Listening_Time'), formatMinutes(stats.listeningMs)),
-    field(env('WIDGET_FIELD_UNIQUE_SONGS', 'Unique_Songs'), String(stats.uniqueSongs)),
-    field(env('WIDGET_FIELD_DIFFERENT_ARTISTS', 'Different_Artists'), String(stats.differentArtists)),
-    field(env('WIDGET_FIELD_DIFFERENT_ALBUMS', 'Different_Albums'), String(stats.differentAlbums)),
-    field(env('WIDGET_FIELD_MOST_LISTENED_GENRE', 'Most_Listened_Genre'), stats.mostListenedGenre)
+    field(fields.topHeroTitle, widgetConfig.topHeroTitle),
+    field(fields.during, widgetConfig.during),
+    field(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()}`),
+    field(fields.mainTitle, widgetConfig.mainTitle),
+    field(fields.songsPlayed, String(stats.songsPlayed)),
+    field(fields.listeningTime, formatMinutes(stats.listeningMs)),
+    field(fields.uniqueSongs, String(stats.uniqueSongs)),
+    field(fields.differentArtists, String(stats.differentArtists)),
+    field(fields.differentAlbums, String(stats.differentAlbums)),
+    field(fields.mostListenedGenre, stats.mostListenedGenre)
   ];
 
-  const lastUpdatedField = env('WIDGET_FIELD_LAST_UPDATED');
-  if (lastUpdatedField) {
-    dynamic.push(field(lastUpdatedField, formatLocalUpdatedAt()));
-  }
-
   return {
-    username: env('WIDGET_USERNAME', 'My Spotify Stats'),
+    username: widgetConfig.username,
     data: { dynamic }
   };
 }
 
 function field(name, value) {
+  if (!name) {
+    throw new Error('Widget field name is missing. Check config/widget.json.');
+  }
   return { type: 1, name, value };
 }
 
@@ -33,7 +36,7 @@ export async function patchDiscordWidget(stats, options = {}) {
   const payload = buildWidgetPayload(stats);
   const hash = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 
-  if (envBool('PATCH_ONLY_WHEN_CHANGED', true) && !options.force) {
+  if (appConfig.patchOnlyWhenChanged && !options.force) {
     const previousHash = getState('discord_widget_payload_hash');
     if (previousHash === hash) {
       return { patched: false, skipped: true, reason: 'unchanged' };

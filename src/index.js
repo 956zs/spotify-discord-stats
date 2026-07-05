@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits } from 'discord.js';
-import { envInt, requiredEnv } from './env.js';
+import { requiredEnv } from './env.js';
+import { appConfig } from './config.js';
 import { getDbHealth } from './db.js';
 import { syncOnce } from './sync.js';
 import { runSpotifyReauthReminder, startSpotifyReauthReminder } from './reminder.js';
@@ -19,7 +20,7 @@ client.once('ready', () => {
 });
 
 function startBackgroundSync() {
-  const intervalSeconds = envInt('SYNC_INTERVAL_SECONDS', 300);
+  const intervalSeconds = appConfig.syncIntervalSeconds;
   if (intervalSeconds <= 0) {
     console.log('Background sync disabled.');
     return;

@@ -19,7 +19,10 @@ npm install
 cp .env.example .env
 ```
 
-Fill `.env`.
+Fill `.env` with secrets and deployment values. Non-secret behavior settings
+live in `config/app.json` and `config/widget.json`.
+
+For Cloudflare Workers/D1 deployment, use [docs/cloudflare-worker.md](docs/cloudflare-worker.md).
 
 ## Create Spotify App
 
@@ -128,9 +131,21 @@ The importer supports common Spotify export fields such as `ts`, `ms_played`,
 The export usually has accurate `ms_played`, while future API syncs estimate
 listening time with track duration.
 
-## Widget fields
+## Config
 
-The env field names must match the Discord widget editor `Data Field` names:
+Runtime behavior lives in [config/app.json](config/app.json):
+
+- `syncIntervalSeconds`: API sync interval. Default is 900 seconds.
+- `statsDays`: stats window. Default is 28 days.
+- `patchDiscordOnSync`: PATCH Discord after each sync.
+- `patchOnlyWhenChanged`: avoid PATCHing identical widget payloads.
+- `spotifyRefreshTokenValidDays`: refresh token validity window.
+- `spotifyReauthRemindDays`: when to DM reauthorization reminders.
+- `reauthReminderIntervalHours`: reminder check interval.
+
+Discord widget payload mapping lives in [config/widget.json](config/widget.json).
+
+The field names must match the Discord widget editor `Data Field` names:
 
 - `Songs_Played`
 - `Listening_Time`
@@ -139,4 +154,4 @@ The env field names must match the Discord widget editor `Data Field` names:
 - `Different_Albums`
 - `Most_Listened_Genre`
 
-Change them in `.env` if your widget uses different names.
+Change them in `config/widget.json` if your widget uses different names.
