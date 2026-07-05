@@ -5,7 +5,12 @@ import { patchDiscordWidget } from './widget.js';
 
 export async function syncOnce(options = {}) {
   const recentlyPlayed = await syncRecentlyPlayed();
-  const genres = await refreshMissingArtistGenres();
+  let genres;
+  try {
+    genres = await refreshMissingArtistGenres();
+  } catch (error) {
+    genres = { updated: 0, skipped: true, error: error.message };
+  }
   const stats = getConfiguredStats();
 
   let discord = { patched: false, skipped: true, reason: 'disabled' };

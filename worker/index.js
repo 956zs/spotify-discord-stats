@@ -57,8 +57,12 @@ async function handleRequest(request, env, ctx) {
 async function handleScheduled(env) {
   const result = await syncOnce(env);
   console.log('scheduled sync', result);
-  const reminder = await runSpotifyReauthReminder(env);
-  console.log('reauth reminder', reminder);
+  try {
+    const reminder = await runSpotifyReauthReminder(env);
+    console.log('reauth reminder', reminder);
+  } catch (error) {
+    console.warn('reauth reminder failed', error.message);
+  }
 }
 
 async function handleSpotifyCallback(url, env) {
@@ -78,7 +82,10 @@ async function handleSpotifyCallback(url, env) {
   }
 
   const token = await exchangeSpotifyCode(env, code);
-  await sendDiscordDm(env, 'Spotify authorization completed. New refresh token was saved in D1.');
+  const notification = await trySendDiscordDm(
+    env,
+    'Spotify authorization completed. New refresh token was saved in D1.'
+  );
 
   if (!token.refresh_token) {
     console.warn('Spotify token response did not contain a refresh token.');
@@ -86,13 +93,20 @@ async function handleSpotifyCallback(url, env) {
 
   return html(
     'Spotify authorization complete',
-    `Refresh token saved at ${new Date().toISOString()}. You can close this tab.`
+    notification.sent
+      ? `Refresh token saved at ${new Date().toISOString()}. You can close this tab.`
+      : `Refresh token saved at ${new Date().toISOString()}. Discord DM was skipped: ${notification.error}. You can close this tab.`
   );
 }
 
 async function syncOnce(env, options = {}) {
   const recentlyPlayed = await syncRecentlyPlayed(env);
-  const genres = await refreshMissingArtistGenres(env);
+  let genres;
+  try {
+    genres = await refreshMissingArtistGenres(env);
+  } catch (error) {
+    genres = { updated: 0, skipped: true, error: error.message };
+  }
   const stats = await getStats(env.DB, appConfig.statsDays);
 
   let discord = { patched: false, skipped: true, reason: 'disabled' };
@@ -621,8 +635,11 @@ async function sendOncePerDay(env, reason, message) {
     return { sent: false, reason: 'already_sent_today' };
   }
 
-  await sendDiscordDm(env, message);
+  const notification = await trySendDiscordDm(env, message);
   await setState(env.DB, stateKey, today);
+  if (!notification.sent) {
+    return { sent: false, reason: 'discord_dm_failed', error: notification.error };
+  }
   return { sent: true, reason };
 }
 
@@ -646,6 +663,16 @@ async function sendDiscordDm(env, content) {
   const message = await messageResponse.json().catch(() => ({}));
   if (!messageResponse.ok) {
     throw new Error(`Discord send DM failed ${messageResponse.status}: ${JSON.stringify(message)}`);
+  }
+}
+
+async function trySendDiscordDm(env, content) {
+  try {
+    await sendDiscordDm(env, content);
+    return { sent: true };
+  } catch (error) {
+    console.warn('Discord DM failed', error.message);
+    return { sent: false, error: error.message };
   }
 }
 

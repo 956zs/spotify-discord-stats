@@ -9,6 +9,10 @@ This deploys the Spotify stats service to Cloudflare Workers:
 
 Cloudflare Tunnel and local ports are not needed for this deployment target.
 
+Discord DMs only work if the bot shares a server with the target Discord user
+and that user allows DMs. If DMs fail, Spotify authorization and sync still
+continue; the Worker logs the failure and skips the notification.
+
 ## Required Cloudflare Auth
 
 Run this locally and finish the browser authorization:
