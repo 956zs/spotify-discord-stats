@@ -24,6 +24,13 @@ live in `config/app.json` and `config/widget.json`.
 
 For Cloudflare Workers/D1 deployment, use [docs/cloudflare-worker.md](docs/cloudflare-worker.md).
 
+## Project Layout
+
+- `src/`: Node/VPS runtime for the Discord bot, SQLite storage, OAuth callback server, and local sync loop.
+- `worker/`: Cloudflare Worker runtime, split by route, OAuth, Spotify, Discord, D1 state, stats, and widget responsibilities.
+- `shared/`: runtime-neutral helpers for time formatting, stable keys, and Spotify play normalization.
+- `scripts/`: maintenance utilities such as Spotify export import for D1.
+
 ## Create Spotify App
 
 1. Open the Spotify Developer Dashboard.

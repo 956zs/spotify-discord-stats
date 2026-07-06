@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { env } from './env.js';
-import { fallbackKey } from './keys.js';
-import { isoToMs, nowIso, sinceIso } from './time.js';
+import { exportRowToPlayRecords, spotifyItemToPlayRecords } from '../shared/play-records.js';
+import { nowIso, sinceIso } from './time.js';
 
 let database;
 
@@ -88,118 +88,28 @@ export function setState(key, value) {
 }
 
 export function upsertSpotifyPlay(item) {
-  if (!item?.track || item.track.type !== 'track' || !item.played_at) {
-    return false;
-  }
-
-  const track = item.track;
-  const playedAt = item.played_at;
-  const playedAtMs = isoToMs(playedAt);
-  if (!playedAtMs) {
-    return false;
-  }
-
-  const album = track.album ?? {};
-  const trackId = track.id || spotifyIdFromUri(track.uri);
-  const albumId = album.id || spotifyIdFromUri(album.uri);
-  const trackKey = trackId || track.uri || fallbackKey('track', track.name, album.name);
-  const albumKey = albumId || album.uri || fallbackKey('album', album.name);
-  const inserted = insertPlay({
-    playedAt,
-    playedAtMs,
-    trackKey,
-    trackId: trackId ?? null,
-    trackUri: track.uri ?? null,
-    trackName: track.name ?? 'Unknown Track',
-    albumKey,
-    albumId: albumId ?? null,
-    albumUri: album.uri ?? null,
-    albumName: album.name ?? null,
-    durationMs: track.duration_ms ?? null,
-    msPlayed: null,
-    source: 'spotify_api'
-  });
-
-  for (const artist of track.artists ?? []) {
-    const artistId = artist.id || spotifyIdFromUri(artist.uri);
-    const artistKey = artistId || artist.uri || fallbackKey('artist', artist.name);
-    upsertPlayArtist({
-      playedAt,
-      trackKey,
-      artistKey,
-      artistId: artistId ?? null,
-      artistUri: artist.uri ?? null,
-      artistName: artist.name ?? 'Unknown Artist'
-    });
-  }
-
-  return inserted;
+  return upsertPlayRecords(spotifyItemToPlayRecords(item));
 }
 
 export function upsertExportPlay(row) {
-  const playedAt = parseExportPlayedAt(row);
-  if (!playedAt) {
-    return false;
-  }
-
-  const playedAtMs = isoToMs(playedAt);
-  if (!playedAtMs) {
-    return false;
-  }
-
-  const trackName =
-    row.master_metadata_track_name ??
-    row.trackName ??
-    row.track_name ??
-    null;
-  const artistName =
-    row.master_metadata_album_artist_name ??
-    row.artistName ??
-    row.artist_name ??
-    null;
-
-  if (!trackName || !artistName) {
-    return false;
-  }
-
-  const albumName =
-    row.master_metadata_album_album_name ??
-    row.albumName ??
-    row.album_name ??
-    null;
-  const trackUri = row.spotify_track_uri ?? row.spotifyTrackUri ?? row.track_uri ?? null;
-  const trackId = spotifyIdFromUri(trackUri);
-  const trackKey = trackId || trackUri || fallbackKey('track', trackName, artistName, albumName);
-  const albumKey = albumName ? fallbackKey('album', albumName, artistName) : null;
-  const artistKey = fallbackKey('artist', artistName);
-
-  const inserted = insertPlay({
-    playedAt,
-    playedAtMs,
-    trackKey,
-    trackId,
-    trackUri,
-    trackName,
-    albumKey,
-    albumId: null,
-    albumUri: null,
-    albumName,
-    durationMs: null,
-    msPlayed: row.ms_played ?? row.msPlayed ?? null,
-    source: 'spotify_export'
+  return upsertPlayRecords(exportRowToPlayRecords(row), {
+    insertArtistsOnlyWhenPlayInserted: true
   });
+}
 
-  if (inserted) {
-    upsertPlayArtist({
-      playedAt,
-      trackKey,
-      artistKey,
-      artistId: null,
-      artistUri: null,
-      artistName
-    });
+function upsertPlayRecords(records, options = {}) {
+  if (!records) {
+    return false;
   }
 
+  const inserted = insertPlay(records.play);
+  if (options.insertArtistsOnlyWhenPlayInserted && !inserted) {
+    return inserted;
+  }
+
+  for (const artist of records.artists) {
+    upsertPlayArtist(artist);
+  }
   return inserted;
 }
 
@@ -230,23 +140,26 @@ function insertPlay(play) {
         duration_ms = COALESCE(plays.duration_ms, excluded.duration_ms),
         ms_played = COALESCE(excluded.ms_played, plays.ms_played)
     `)
-    .run(
-      play.playedAt,
-      play.playedAtMs,
-      play.trackKey,
-      play.trackId,
-      play.trackUri,
-      play.trackName,
-      play.albumKey,
-      play.albumId,
-      play.albumUri,
-      play.albumName,
-      play.durationMs,
-      play.msPlayed,
-      play.source,
-      nowIso()
-    );
+    .run(...playBindings(play), nowIso());
   return !existed;
+}
+
+function playBindings(play) {
+  return [
+    play.playedAt,
+    play.playedAtMs,
+    play.trackKey,
+    play.trackId,
+    play.trackUri,
+    play.trackName,
+    play.albumKey,
+    play.albumId,
+    play.albumUri,
+    play.albumName,
+    play.durationMs,
+    play.msPlayed,
+    play.source
+  ];
 }
 
 function upsertPlayArtist(artist) {
@@ -276,36 +189,6 @@ function upsertPlayArtist(artist) {
         artist_name = excluded.artist_name
     `)
     .run(artist.artistKey, artist.artistId, artist.artistUri, artist.artistName);
-}
-
-function parseExportPlayedAt(row) {
-  if (row.ts) {
-    return new Date(row.ts).toISOString();
-  }
-
-  if (row.endTime) {
-    const normalized = String(row.endTime).replace(' ', 'T');
-    return new Date(`${normalized}Z`).toISOString();
-  }
-
-  if (row.played_at) {
-    return new Date(row.played_at).toISOString();
-  }
-
-  return null;
-}
-
-function spotifyIdFromUri(uri) {
-  if (!uri || typeof uri !== 'string') {
-    return null;
-  }
-
-  const parts = uri.split(':');
-  if (parts.length !== 3 || parts[0] !== 'spotify') {
-    return null;
-  }
-
-  return parts[2] || null;
 }
 
 export function getStats(days) {

@@ -3,6 +3,11 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
+import { exportRowToPlayRecords } from '../shared/play-records.js';
+
+const CHUNK_INDEX_PAD_WIDTH = 4;
+const DEFAULT_BATCH_SIZE = 200;
+const STATEMENTS_PER_EXPORT_ROW = 3;
 
 const options = parseArgs(process.argv.slice(2));
 if (options.targets.length === 0) {
@@ -38,7 +43,7 @@ for (const file of jsonFiles) {
     }
 
     statements.push(...rowStatements);
-    if (statements.length >= options.batchSize * 3) {
+    if (statements.length >= options.batchSize * STATEMENTS_PER_EXPORT_ROW) {
       executeChunk();
     }
   }
@@ -55,7 +60,10 @@ console.log(`SQL chunks kept in ${tempDir}`);
 
 function executeChunk() {
   chunkIndex += 1;
-  const filePath = path.join(tempDir, `chunk-${String(chunkIndex).padStart(4, '0')}.sql`);
+  const filePath = path.join(
+    tempDir,
+    `chunk-${String(chunkIndex).padStart(CHUNK_INDEX_PAD_WIDTH, '0')}.sql`
+  );
   fs.writeFileSync(filePath, `BEGIN TRANSACTION;\n${statements.join('\n')}\nCOMMIT;\n`);
   statements = [];
 
@@ -77,39 +85,27 @@ function executeChunk() {
 }
 
 function exportRowToSql(row) {
-  const playedAt = parseExportPlayedAt(row);
-  const trackName = row.master_metadata_track_name ?? row.trackName ?? row.track_name ?? null;
-  const artistName =
-    row.master_metadata_album_artist_name ?? row.artistName ?? row.artist_name ?? null;
-
-  if (!playedAt || !trackName || !artistName) {
+  const records = exportRowToPlayRecords(row);
+  if (!records) {
     return [];
   }
 
-  const playedAtMs = Date.parse(playedAt);
-  if (Number.isNaN(playedAtMs)) {
-    return [];
-  }
-
-  const albumName =
-    row.master_metadata_album_album_name ?? row.albumName ?? row.album_name ?? null;
-  const trackUri = row.spotify_track_uri ?? row.spotifyTrackUri ?? row.track_uri ?? null;
-  const trackId = spotifyIdFromUri(trackUri);
-  const trackKey = trackId || trackUri || fallbackKey('track', trackName, artistName, albumName);
-  const albumKey = albumName ? fallbackKey('album', albumName, artistName) : null;
-  const artistKey = fallbackKey('artist', artistName);
-  const msPlayed = row.ms_played ?? row.msPlayed ?? null;
   const createdAt = new Date().toISOString();
-
   return [
-    `INSERT INTO plays (
+    playToSql(records.play, createdAt),
+    ...records.artists.map(artistToSql)
+  ];
+}
+
+function playToSql(play, createdAt) {
+  return `INSERT INTO plays (
   played_at, played_at_ms, track_key, track_id, track_uri, track_name,
   album_key, album_id, album_uri, album_name, duration_ms, ms_played,
   source, created_at
 )
 VALUES (
-  ${sqlString(playedAt)}, ${playedAtMs}, ${sqlString(trackKey)}, ${sqlString(trackId)}, ${sqlString(trackUri)}, ${sqlString(trackName)},
-  ${sqlString(albumKey)}, NULL, NULL, ${sqlString(albumName)}, NULL, ${sqlNumber(msPlayed)},
+  ${sqlString(play.playedAt)}, ${play.playedAtMs}, ${sqlString(play.trackKey)}, ${sqlString(play.trackId)}, ${sqlString(play.trackUri)}, ${sqlString(play.trackName)},
+  ${sqlString(play.albumKey)}, ${sqlString(play.albumId)}, ${sqlString(play.albumUri)}, ${sqlString(play.albumName)}, ${sqlNumber(play.durationMs)}, ${sqlNumber(play.msPlayed)},
   'spotify_export', ${sqlString(createdAt)}
 )
 ON CONFLICT(played_at, track_key) DO UPDATE SET
@@ -118,39 +114,26 @@ ON CONFLICT(played_at, track_key) DO UPDATE SET
   track_name = COALESCE(excluded.track_name, plays.track_name),
   album_key = COALESCE(plays.album_key, excluded.album_key),
   album_name = COALESCE(plays.album_name, excluded.album_name),
-  ms_played = COALESCE(excluded.ms_played, plays.ms_played);`,
+  ms_played = COALESCE(excluded.ms_played, plays.ms_played);`;
+}
+
+function artistToSql(artist) {
+  return [
     `INSERT OR IGNORE INTO play_artists (
   played_at, track_key, artist_key, artist_id, artist_uri, artist_name
 )
 SELECT
-  ${sqlString(playedAt)}, ${sqlString(trackKey)}, ${sqlString(artistKey)}, NULL, NULL, ${sqlString(artistName)}
+  ${sqlString(artist.playedAt)}, ${sqlString(artist.trackKey)}, ${sqlString(artist.artistKey)}, ${sqlString(artist.artistId)}, ${sqlString(artist.artistUri)}, ${sqlString(artist.artistName)}
 WHERE NOT EXISTS (
   SELECT 1 FROM play_artists
-  WHERE played_at = ${sqlString(playedAt)}
-    AND track_key = ${sqlString(trackKey)}
+  WHERE played_at = ${sqlString(artist.playedAt)}
+    AND track_key = ${sqlString(artist.trackKey)}
 );`,
     `INSERT INTO artists (artist_key, artist_id, artist_uri, artist_name)
-VALUES (${sqlString(artistKey)}, NULL, NULL, ${sqlString(artistName)})
+VALUES (${sqlString(artist.artistKey)}, ${sqlString(artist.artistId)}, ${sqlString(artist.artistUri)}, ${sqlString(artist.artistName)})
 ON CONFLICT(artist_key) DO UPDATE SET
   artist_name = excluded.artist_name;`
-  ];
-}
-
-function parseExportPlayedAt(row) {
-  if (row.ts) {
-    return new Date(row.ts).toISOString();
-  }
-
-  if (row.endTime) {
-    const normalized = String(row.endTime).replace(' ', 'T');
-    return new Date(`${normalized}Z`).toISOString();
-  }
-
-  if (row.played_at) {
-    return new Date(row.played_at).toISOString();
-  }
-
-  return null;
+  ].join('\n');
 }
 
 function findJsonFiles(target) {
@@ -176,7 +159,7 @@ function parseArgs(args) {
     dbName: 'spotify-discord-stats',
     remote: false,
     dryRun: false,
-    batchSize: 200,
+    batchSize: DEFAULT_BATCH_SIZE,
     targets: []
   };
 
@@ -217,30 +200,6 @@ function sqlNumber(value) {
   }
   const number = Number(value);
   return Number.isFinite(number) ? String(Math.trunc(number)) : 'NULL';
-}
-
-function normalizeKey(value) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-}
-
-function fallbackKey(prefix, ...parts) {
-  return `${prefix}:${parts.map(normalizeKey).join('|')}`;
-}
-
-function spotifyIdFromUri(uri) {
-  if (!uri || typeof uri !== 'string') {
-    return null;
-  }
-
-  const parts = uri.split(':');
-  if (parts.length !== 3 || parts[0] !== 'spotify') {
-    return null;
-  }
-
-  return parts[2] || null;
 }
 
 function usage() {
