@@ -1,6 +1,6 @@
 import { appConfig } from './config.js';
 import { syncRecentlyPlayed } from './spotify.js';
-import { getConfiguredStats } from './stats.js';
+import { getConfiguredStats, getConfiguredStatsRanges } from './stats.js';
 import { patchDiscordWidget } from './widget.js';
 
 export async function syncOnce(options = {}) {
@@ -13,5 +13,9 @@ export async function syncOnce(options = {}) {
     discord = await patchDiscordWidget(stats, { force: options.forcePatch });
   }
 
-  return { recentlyPlayed, genres, stats, discord };
+  const result = { recentlyPlayed, genres, stats, discord };
+  if (options.includeStatsRanges) {
+    result.statsRanges = getConfiguredStatsRanges();
+  }
+  return result;
 }

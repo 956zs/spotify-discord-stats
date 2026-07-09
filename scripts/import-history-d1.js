@@ -26,6 +26,9 @@ let seen = 0;
 let skipped = 0;
 let statements = [];
 let chunkIndex = 0;
+const importStartedAt = new Date().toISOString();
+
+console.log(`Import started at ${importStartedAt}`);
 
 for (const file of jsonFiles) {
   const rows = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -57,6 +60,8 @@ if (statements.length > 0) {
 
 console.log(`Done. Seen ${seen}, skipped ${skipped}, chunks ${chunkIndex}.`);
 console.log(`SQL chunks kept in ${tempDir}`);
+console.log(`Import rollback marker: ${importStartedAt}`);
+console.log('Rollback only this import with the SQL in docs/backup-rollback-and-import.md.');
 
 function executeChunk() {
   chunkIndex += 1;
@@ -90,9 +95,8 @@ function exportRowToSql(row) {
     return [];
   }
 
-  const createdAt = new Date().toISOString();
   return [
-    playToSql(records.play, createdAt),
+    playToSql(records.play, importStartedAt),
     ...records.artists.map(artistToSql)
   ];
 }
@@ -100,12 +104,12 @@ function exportRowToSql(row) {
 function playToSql(play, createdAt) {
   return `INSERT INTO plays (
   played_at, played_at_ms, track_key, track_id, track_uri, track_name,
-  album_key, album_id, album_uri, album_name, duration_ms, ms_played,
-  source, created_at
+  album_key, album_id, album_uri, album_name, album_image_url, duration_ms,
+  ms_played, source, created_at
 )
 VALUES (
   ${sqlString(play.playedAt)}, ${play.playedAtMs}, ${sqlString(play.trackKey)}, ${sqlString(play.trackId)}, ${sqlString(play.trackUri)}, ${sqlString(play.trackName)},
-  ${sqlString(play.albumKey)}, ${sqlString(play.albumId)}, ${sqlString(play.albumUri)}, ${sqlString(play.albumName)}, ${sqlNumber(play.durationMs)}, ${sqlNumber(play.msPlayed)},
+  ${sqlString(play.albumKey)}, ${sqlString(play.albumId)}, ${sqlString(play.albumUri)}, ${sqlString(play.albumName)}, ${sqlString(play.albumImageUrl)}, ${sqlNumber(play.durationMs)}, ${sqlNumber(play.msPlayed)},
   'spotify_export', ${sqlString(createdAt)}
 )
 ON CONFLICT(played_at, track_key) DO UPDATE SET
@@ -114,6 +118,7 @@ ON CONFLICT(played_at, track_key) DO UPDATE SET
   track_name = COALESCE(excluded.track_name, plays.track_name),
   album_key = COALESCE(plays.album_key, excluded.album_key),
   album_name = COALESCE(plays.album_name, excluded.album_name),
+  album_image_url = COALESCE(plays.album_image_url, excluded.album_image_url),
   ms_played = COALESCE(excluded.ms_played, plays.ms_played);`;
 }
 

@@ -24,10 +24,10 @@ async function upsertPlay(db, play) {
     .prepare(`
       INSERT INTO plays (
         played_at, played_at_ms, track_key, track_id, track_uri, track_name,
-        album_key, album_id, album_uri, album_name, duration_ms, ms_played,
-        source, created_at
+        album_key, album_id, album_uri, album_name, album_image_url,
+        duration_ms, ms_played, source, created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(played_at, track_key) DO UPDATE SET
         track_id = COALESCE(plays.track_id, excluded.track_id),
         track_uri = COALESCE(plays.track_uri, excluded.track_uri),
@@ -36,6 +36,7 @@ async function upsertPlay(db, play) {
         album_id = COALESCE(plays.album_id, excluded.album_id),
         album_uri = COALESCE(plays.album_uri, excluded.album_uri),
         album_name = COALESCE(plays.album_name, excluded.album_name),
+        album_image_url = COALESCE(plays.album_image_url, excluded.album_image_url),
         duration_ms = COALESCE(plays.duration_ms, excluded.duration_ms),
         ms_played = COALESCE(excluded.ms_played, plays.ms_played)
     `)
@@ -81,6 +82,7 @@ function playBindings(play) {
     play.albumId,
     play.albumUri,
     play.albumName,
+    play.albumImageUrl,
     play.durationMs,
     play.msPlayed,
     play.source

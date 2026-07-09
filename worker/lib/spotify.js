@@ -12,7 +12,7 @@ export function buildSpotifyAuthorizeUrl(env, state) {
   url.searchParams.set('client_id', requiredEnv(env, 'SPOTIFY_CLIENT_ID'));
   url.searchParams.set(
     'scope',
-    ['user-read-recently-played', 'user-read-currently-playing'].join(' ')
+    ['user-read-recently-played'].join(' ')
   );
   url.searchParams.set('redirect_uri', requiredEnv(env, 'SPOTIFY_REDIRECT_URI'));
   url.searchParams.set('state', state);
@@ -86,9 +86,9 @@ async function spotifyTokenRequest(env, body) {
     body
   });
 
-  const payload = await response.json().catch(() => ({}));
+  const payload = await responsePayload(response);
   if (!response.ok) {
-    throw new Error(`Spotify token error ${response.status}: ${JSON.stringify(payload)}`);
+    throw new Error(`Spotify token error ${response.status}: ${errorDetail(payload)}`);
   }
   return payload;
 }
@@ -127,12 +127,29 @@ async function spotifyApiFetch(url, accessToken) {
     throw new Error(`Spotify rate limited this request. Retry-After: ${retryAfter}`);
   }
 
-  const payload = await response.json().catch(() => ({}));
+  const payload = await responsePayload(response);
   if (!response.ok) {
-    throw new Error(`Spotify API error ${response.status}: ${JSON.stringify(payload)}`);
+    throw new Error(`Spotify API error ${response.status}: ${errorDetail(payload)}`);
   }
 
   return payload;
+}
+
+async function responsePayload(response) {
+  const text = await response.text();
+  if (text.trim() === '') {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function errorDetail(payload) {
+  return typeof payload === 'string' ? payload : JSON.stringify(payload);
 }
 
 async function persistRecentlyPlayed(db, items, lastAfter) {

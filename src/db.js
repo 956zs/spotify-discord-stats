@@ -3,6 +3,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { env } from './env.js';
 import { exportRowToPlayRecords, spotifyItemToPlayRecords } from '../shared/play-records.js';
+import { playRowToSongStatus } from '../shared/song.js';
 import { nowIso, sinceIso } from './time.js';
 
 let database;
@@ -40,6 +41,7 @@ function migrate(db) {
       album_id TEXT,
       album_uri TEXT,
       album_name TEXT,
+      album_image_url TEXT,
       duration_ms INTEGER,
       ms_played INTEGER,
       source TEXT NOT NULL,
@@ -70,6 +72,20 @@ function migrate(db) {
     CREATE INDEX IF NOT EXISTS idx_play_artists_artist_key ON play_artists (artist_key);
     CREATE INDEX IF NOT EXISTS idx_artists_artist_id ON artists (artist_id);
   `);
+
+  ensureColumn(db, 'plays', 'album_image_url', 'TEXT');
+}
+
+function ensureColumn(db, table, column, definition) {
+  const exists = db
+    .prepare(`PRAGMA table_info(${table})`)
+    .all()
+    .some((row) => row.name === column);
+  if (exists) {
+    return;
+  }
+
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
 export function getState(key) {
@@ -125,10 +141,10 @@ function insertPlay(play) {
     .prepare(`
       INSERT INTO plays (
         played_at, played_at_ms, track_key, track_id, track_uri, track_name,
-        album_key, album_id, album_uri, album_name, duration_ms, ms_played,
-        source, created_at
+        album_key, album_id, album_uri, album_name, album_image_url,
+        duration_ms, ms_played, source, created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(played_at, track_key) DO UPDATE SET
         track_id = COALESCE(plays.track_id, excluded.track_id),
         track_uri = COALESCE(plays.track_uri, excluded.track_uri),
@@ -137,6 +153,7 @@ function insertPlay(play) {
         album_id = COALESCE(plays.album_id, excluded.album_id),
         album_uri = COALESCE(plays.album_uri, excluded.album_uri),
         album_name = COALESCE(plays.album_name, excluded.album_name),
+        album_image_url = COALESCE(plays.album_image_url, excluded.album_image_url),
         duration_ms = COALESCE(plays.duration_ms, excluded.duration_ms),
         ms_played = COALESCE(excluded.ms_played, plays.ms_played)
     `)
@@ -156,6 +173,7 @@ function playBindings(play) {
     play.albumId,
     play.albumUri,
     play.albumName,
+    play.albumImageUrl,
     play.durationMs,
     play.msPlayed,
     play.source
@@ -216,7 +234,7 @@ export function getStats(days) {
 
   const topAlbum = db
     .prepare(`
-      SELECT album_name, COUNT(*) AS plays
+      SELECT album_name, MAX(album_image_url) AS album_image_url, COUNT(*) AS plays
       FROM plays
       WHERE played_at >= ?
         AND album_name IS NOT NULL
@@ -236,8 +254,32 @@ export function getStats(days) {
     differentArtists: Number(artistSummary.different_artists ?? 0),
     differentAlbums: Number(summary.different_albums ?? 0),
     topAlbum: topAlbum?.album_name ?? 'unknown',
+    topAlbumImageUrl: topAlbum?.album_image_url ?? null,
     topAlbumPlays: Number(topAlbum?.plays ?? 0)
   };
+}
+
+export function getLastPlayedSong() {
+  const row = getDb()
+    .prepare(`
+      SELECT
+        p.played_at,
+        p.track_name,
+        p.album_name,
+        p.album_image_url,
+        (
+          SELECT GROUP_CONCAT(pa.artist_name, ', ')
+          FROM play_artists pa
+          WHERE pa.played_at = p.played_at
+            AND pa.track_key = p.track_key
+        ) AS artist_names
+      FROM plays p
+      ORDER BY p.played_at_ms DESC
+      LIMIT 1
+    `)
+    .get();
+
+  return playRowToSongStatus(row);
 }
 
 export function getDbHealth() {

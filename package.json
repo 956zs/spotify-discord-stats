@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node src/index.js",
+    "test": "node --test",
     "spotify:auth-url": "node src/spotify-auth-url.js",
     "spotify:token": "node src/spotify-token.js",
     "spotify:sync": "node src/worker.js --once",
@@ -18,7 +19,10 @@
     "cf:d1:create": "wrangler d1 create spotify-discord-stats",
     "cf:d1:migrate:local": "wrangler d1 migrations apply spotify-discord-stats --local",
     "cf:d1:migrate:remote": "wrangler d1 migrations apply spotify-discord-stats --remote",
-    "cf:import": "node scripts/import-history-d1.js"
+    "cf:d1:backup:local": "node scripts/d1-backup.js --local",
+    "cf:d1:backup:remote": "node scripts/d1-backup.js --remote",
+    "cf:import": "node scripts/import-history-d1.js",
+    "prototype:recap-demo": "node scripts/recap-demo-server.js"
   },
   "dependencies": {
     "discord.js": "^14.26.2"

@@ -1,5 +1,6 @@
 .env
 data/
+backups/
 node_modules/
 npm-debug.log*
 .wrangler/

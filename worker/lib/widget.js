@@ -11,6 +11,7 @@ export function buildWidgetPayload(stats) {
     widgetField(fields.topHeroTitle, widgetConfig.topHeroTitle),
     widgetField(fields.during, formatDateRange(stats.since)),
     widgetField(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()} (UTC +8)`),
+    widgetField(fields.song, stats.lastPlayed.value),
     widgetField(fields.mainTitle, `${widgetConfig.mainTitle} ${stats.songsPlayed}`),
     widgetField(fields.songsPlayed, String(stats.songsPlayed)),
     widgetField(fields.listeningTime, formatMinutes(stats.listeningMs)),

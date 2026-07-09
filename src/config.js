@@ -7,23 +7,32 @@ const projectRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const defaultAppConfig = {
   syncIntervalSeconds: 600,
   statsDays: 28,
+  statsRangeDays: [7, 28, 90],
   patchDiscordOnSync: true,
   patchOnlyWhenChanged: true,
   spotifyRefreshTokenValidDays: 180,
   spotifyReauthRemindDays: 30,
-  reauthReminderIntervalHours: 24
+  reauthReminderIntervalHours: 24,
+  recapReports: {
+    enabled: true,
+    weeklyDay: 1,
+    monthlyDay: 1,
+    sendHour: 9,
+    sendMinute: 0
+  }
 };
 
 const defaultWidgetConfig = {
   username: 'My Spotify Stats',
-  topHeroTitle: '4w on Spotify🧋',
+  topHeroTitle: '✦ 4w on Spotify🧋',
   during: '',
   lastUpdatedPrefix: 'last updated: ',
-  mainTitle: 'Last 4 Weeks Played:',
+  mainTitle: '✦ Last 4 Weeks Played:',
   fields: {
     topHeroTitle: 'top_hero_title',
     during: 'during',
     lastUpdated: 'last_updated',
+    song: 'song',
     mainTitle: 'main_title',
     songsPlayed: 'Songs_Played',
     listeningTime: 'Listening_Time',

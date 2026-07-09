@@ -11,7 +11,7 @@ export default {
     }
   },
 
-  async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(handleScheduled(env));
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(handleScheduled(env, new Date(controller.scheduledTime)));
   }
 };

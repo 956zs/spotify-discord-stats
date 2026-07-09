@@ -30,6 +30,7 @@ export function spotifyItemToPlayRecords(item) {
       albumId: albumId ?? null,
       albumUri: album.uri ?? null,
       albumName: album.name ?? null,
+      albumImageUrl: bestAlbumImageUrl(album.images),
       durationMs: track.duration_ms ?? null,
       msPlayed: null,
       source: 'spotify_api'
@@ -103,6 +104,7 @@ function exportPlayRecord(options) {
     albumId: null,
     albumUri: null,
     albumName,
+    albumImageUrl: null,
     durationMs: null,
     msPlayed: options.row.ms_played ?? options.row.msPlayed ?? null,
     source: 'spotify_export'
@@ -132,6 +134,37 @@ function spotifyArtistsToRecords(artists = [], playedAt, trackKey) {
       artistName: artist.name ?? 'Unknown Artist'
     };
   });
+}
+
+function bestAlbumImageUrl(images = []) {
+  return images
+    .map(normalizeImage)
+    .filter(Boolean)
+    .sort((left, right) => right.area - left.area)
+    .at(0)?.url ?? null;
+}
+
+function normalizeImage(image) {
+  const url = validHttpUrl(image?.url);
+  if (!url) {
+    return null;
+  }
+
+  const width = Number(image.width ?? 0);
+  const height = Number(image.height ?? 0);
+  return {
+    url,
+    area: Math.max(0, width) * Math.max(0, height)
+  };
+}
+
+function validHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function parseExportPlayedAt(row) {

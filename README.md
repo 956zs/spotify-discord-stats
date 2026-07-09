@@ -1,159 +1,137 @@
 # Spotify Discord Stats
 
-Minimal self-hosted Spotify stats worker for a Discord application widget.
+Self-hosted Spotify listening stats for a Discord application widget and private
+Discord DM recaps.
 
-It stores Spotify plays in SQLite, calculates simple stats, PATCHes the Discord
-application identity profile payload used by Discord widgets, and DMs you before
-the Spotify refresh token needs reauthorization.
+The main deployment target is Cloudflare Workers + D1. The Worker syncs Spotify
+Recently Played every 10 minutes, stores plays in D1, patches the Discord
+application widget, and sends weekly/monthly recap DMs. A local Node/SQLite
+runtime is still available for development and migration work.
+
+## What It Does
+
+- Stores Spotify play history in SQLite/D1.
+- Patches Discord application widget dynamic fields.
+- Shows the last played track from Spotify Recently Played as `song`.
+- Calculates 7, 28, and 90 day stats.
+- Sends Discord DM recap reports with Components v2.
+- Imports Spotify account-data and extended streaming-history exports.
+- Provides D1 backup and rollback notes before large imports.
+
+There are no slash commands. Admin actions are protected by `ADMIN_TOKEN`.
 
 ## Requirements
 
 - Node.js 24+
+- Wrangler authenticated with Cloudflare
+- Cloudflare Workers + D1
 - A Discord application/bot token
 - A Spotify app using Authorization Code flow
 
-## Setup
+## Install
 
 ```bash
 npm install
 cp .env.example .env
 ```
 
-Fill `.env` with secrets and deployment values. Non-secret behavior settings
-live in `config/app.json` and `config/widget.json`.
+Fill `.env` for local development. Cloudflare production secrets are set with
+`wrangler secret put`.
 
-For Cloudflare Workers/D1 deployment, use [docs/cloudflare-worker.md](docs/cloudflare-worker.md).
+Useful docs:
+
+- [Cloudflare Worker deployment](docs/cloudflare-worker.md)
+- [Backup, rollback, and Spotify history import](docs/backup-rollback-and-import.md)
+- [Recap glossary](docs/recap-glossary.md)
 
 ## Project Layout
 
-- `src/`: Node/VPS runtime for the Discord bot, SQLite storage, OAuth callback server, and local sync loop.
-- `worker/`: Cloudflare Worker runtime, split by route, OAuth, Spotify, Discord, D1 state, stats, and widget responsibilities.
-- `shared/`: runtime-neutral helpers for time formatting, stable keys, and Spotify play normalization.
-- `scripts/`: maintenance utilities such as Spotify export import for D1.
+- `src/`: local Node runtime, SQLite storage, OAuth callback server, and sync loop.
+- `worker/`: Cloudflare Worker runtime, routes, D1 access, Spotify, Discord, stats, and delivery.
+- `shared/`: runtime-neutral helpers for time, keys, play parsing, songs, ranges, and recap rendering.
+- `scripts/`: D1 backup/import tools and recap prototype server.
+- `migrations/`: D1 schema migrations.
+- `test/`: Node test suite.
 
-## Create Spotify App
+## Spotify App
 
-1. Open the Spotify Developer Dashboard.
-2. Click **Create app**.
-3. Fill any app name and description.
-4. In the app settings, add this Redirect URI:
-
-```text
-https://your-domain.example/spotify/callback
-```
-
-5. Save settings.
-6. Copy **Client ID** into `SPOTIFY_CLIENT_ID`.
-7. Copy **Client Secret** into `SPOTIFY_CLIENT_SECRET`.
-
-The app uses Authorization Code flow with these scopes:
+Create a Spotify app in the Spotify Developer Dashboard and add the redirect URI
+you deploy with:
 
 ```text
-user-read-recently-played user-read-currently-playing
+https://spotify-stats.mimidlc.me/spotify/callback
 ```
 
-If you want one-click reauthorization from the bot DM, expose this app on your
-VPS and set:
+The app currently needs this scope:
 
-```env
-PUBLIC_BASE_URL=https://your-domain.example
-SPOTIFY_REDIRECT_URI=https://your-domain.example/spotify/callback
-AUTH_SERVER_HOST=127.0.0.1
-AUTH_SERVER_PORT=23189
+```text
+user-read-recently-played
 ```
 
-Add the exact redirect URI to the Spotify developer dashboard.
+The widget uses Last Played from Recently Played, not Now Playing. That keeps
+the sync at one Spotify API read every 10 minutes instead of polling real-time
+player state.
 
-With Cloudflare Tunnel, route your public hostname to the local service:
+## Cloudflare Setup
 
-```yaml
-ingress:
-  - hostname: your-domain.example
-    service: http://127.0.0.1:23189
-  - service: http_status:404
-```
-
-For a quick tunnel test:
+Log in:
 
 ```bash
-cloudflared tunnel --url http://127.0.0.1:23189
+wrangler login
+wrangler whoami
 ```
 
-Generate a Spotify authorization URL:
+Create and configure D1:
 
 ```bash
-npm run spotify:auth-url
+npm run cf:d1:create
 ```
 
-Open the printed URL, authorize, then copy the returned `code` or full callback
-URL and exchange it:
+Copy the returned `database_id` into [wrangler.toml](wrangler.toml).
+
+Set Worker secrets:
 
 ```bash
-npm run spotify:token -- "PASTE_CODE_OR_CALLBACK_URL"
+wrangler secret put DISCORD_TOKEN
+wrangler secret put SPOTIFY_CLIENT_SECRET
+wrangler secret put ADMIN_TOKEN
 ```
 
-The callback server stores new refresh tokens in SQLite. The CLI token command
-also stores the token in SQLite and prints it for backup.
+`ADMIN_TOKEN` protects these routes:
 
-Run once:
+```text
+/spotify/login
+/admin/sync
+/admin/stats
+/admin/recap/weekly/send
+/admin/recap/monthly/send
+```
+
+Apply migrations and deploy:
 
 ```bash
-npm run spotify:sync
+npm run cf:d1:migrate:remote
+npm run cf:deploy
 ```
 
-Run the bot plus background sync loop:
+Authorize Spotify after deploy:
 
-```bash
-npm start
+```text
+https://spotify-stats.mimidlc.me/spotify/login?token=YOUR_ADMIN_TOKEN
 ```
 
-Run only the background worker:
+The callback stores the Spotify refresh token in D1.
 
-```bash
-npm run worker
-```
+## Widget Fields
 
-## Commands
+The Discord widget editor Data Field names must match
+[config/widget.json](config/widget.json):
 
-There are no bot commands. `npm start` logs the bot in, starts the OAuth callback
-server, runs automatic sync, and sends a DM with a reauthorization link when the
-stored refresh token is close to the configured validity window.
-
-## Import Spotify history
-
-You can start recording with the API first, then import Spotify export data
-later. Overlapping plays are deduplicated by `played_at + track_id`, so the same
-play should not be counted twice.
-
-After Spotify gives you the long-term streaming history zip, extract it and run:
-
-```bash
-npm run spotify:import -- /path/to/extracted/history
-```
-
-The importer supports common Spotify export fields such as `ts`, `ms_played`,
-`master_metadata_track_name`, `master_metadata_album_artist_name`,
-`master_metadata_album_album_name`, and `spotify_track_uri`.
-
-The export usually has accurate `ms_played`, while future API syncs estimate
-listening time with track duration.
-
-## Config
-
-Runtime behavior lives in [config/app.json](config/app.json):
-
-- `syncIntervalSeconds`: API sync interval. Default is 600 seconds.
-- `statsDays`: stats window. Default is 28 days.
-- `patchDiscordOnSync`: PATCH Discord after each sync.
-- `patchOnlyWhenChanged`: avoid PATCHing identical widget payloads.
-- `spotifyRefreshTokenValidDays`: refresh token validity window.
-- `spotifyReauthRemindDays`: when to DM reauthorization reminders.
-- `reauthReminderIntervalHours`: reminder check interval.
-
-Discord widget payload mapping lives in [config/widget.json](config/widget.json).
-
-The field names must match the Discord widget editor `Data Field` names:
-
+- `top_hero_title`
+- `during`
+- `last_updated`
+- `song`
+- `main_title`
 - `Songs_Played`
 - `Listening_Time`
 - `Unique_Songs`
@@ -161,4 +139,145 @@ The field names must match the Discord widget editor `Data Field` names:
 - `Different_Albums`
 - `Top_Album`
 
-Change them in `config/widget.json` if your widget uses different names.
+The `song` field is compact by design, for example:
+
+```text
+♪ Call of Silence
+```
+
+If the widget editor does not update immediately, reload the Discord client or
+restart the widget editor.
+
+## Recap Reports
+
+Recaps are Discord DMs rendered with Components v2:
+
+- Weekly: rolling 7 days, Monday 09:00 `Asia/Taipei`.
+- Monthly: previous natural month, every 1st day 09:00 `Asia/Taipei`.
+- Layout uses Containers, Sections, Thumbnails, Media Gallery, Separators, and
+  Text Display markdown.
+- Reports include totals, deltas, top tracks/artists/albums, new tracks,
+  listening patterns, peak day/hour, late-night percent, and streaks.
+
+Manual real-send routes:
+
+```bash
+TOKEN="$(tr -d '\n' < .cloudflare-admin-token)"
+curl -X POST "https://spotify-stats.mimidlc.me/admin/recap/weekly/send?token=${TOKEN}"
+curl -X POST "https://spotify-stats.mimidlc.me/admin/recap/monthly/send?token=${TOKEN}"
+curl -X POST "https://spotify-stats.mimidlc.me/admin/recap/monthly/send?token=${TOKEN}&month=2026-06"
+```
+
+Those routes send real Discord DMs. They are not preview routes.
+
+## Import Spotify History
+
+Spotify exports come in two useful shapes:
+
+- One-year account streaming history, usually with `endTime`, `artistName`,
+  `trackName`, and `msPlayed`.
+- Extended streaming history, usually with `ts`, `ms_played`,
+  `master_metadata_track_name`, `master_metadata_album_artist_name`,
+  `master_metadata_album_album_name`, and `spotify_track_uri`.
+
+The importer supports both. Extended streaming history is better because it has
+album names and Spotify Track URI more often.
+
+Before importing remote D1, read
+[docs/backup-rollback-and-import.md](docs/backup-rollback-and-import.md).
+
+Dry run:
+
+```bash
+npm run cf:import -- --remote --dry-run /path/to/extracted/spotify/export
+```
+
+Backup:
+
+```bash
+npm run cf:d1:backup:remote
+```
+
+Import:
+
+```bash
+npm run cf:import -- --remote /path/to/extracted/spotify/export
+```
+
+Imports deduplicate overlap by `played_at + track_key`. Re-running the same
+export should not double-count plays.
+
+## Backup And Rollback
+
+Worker code rollback:
+
+```bash
+/usr/bin/wrangler versions list --name spotify-discord-stats
+/usr/bin/wrangler rollback --name spotify-discord-stats VERSION_ID
+```
+
+D1 backup:
+
+```bash
+npm run cf:d1:backup:remote
+```
+
+D1 point-in-time restore:
+
+```bash
+/usr/bin/wrangler d1 time-travel info spotify-discord-stats --timestamp="2026-07-09T05:00:00Z"
+/usr/bin/wrangler d1 time-travel restore spotify-discord-stats --timestamp="2026-07-09T05:00:00Z"
+```
+
+D1 restore is destructive and restores the whole database. For deleting only one
+bad Spotify export import, use the targeted SQL in
+[docs/backup-rollback-and-import.md](docs/backup-rollback-and-import.md).
+
+## Commands
+
+```bash
+npm test
+npm run spotify:auth-url
+npm run spotify:token -- "PASTE_CODE_OR_CALLBACK_URL"
+npm run spotify:sync
+npm run spotify:import -- /path/to/extracted/history
+npm run cf:dev
+npm run cf:deploy
+npm run cf:d1:migrate:remote
+npm run cf:d1:backup:remote
+npm run cf:import -- --remote /path/to/extracted/history
+npm run prototype:recap-demo
+```
+
+## Local Runtime
+
+Local Node/SQLite still works for development:
+
+```bash
+npm run spotify:auth-url
+npm run spotify:token -- "PASTE_CODE_OR_CALLBACK_URL"
+npm run spotify:sync
+npm start
+```
+
+Local data is stored under `data/` by default and is gitignored.
+
+## Testing
+
+Run tests and syntax checks:
+
+```bash
+npm test
+find src worker shared scripts test -name '*.js' -print0 | xargs -0 -n 1 node --check
+```
+
+Backend tests should finish quickly; keep `timeout 60 npm test` for automation.
+
+## Notes
+
+- Spotify export imports do not include album artwork. API-synced rows can store
+  album artwork from Spotify track metadata.
+- Discord DMs require the bot to share a server with the target user and for DMs
+  to be allowed.
+- Spotify may reject Recently Played API calls if the Spotify app owner's
+  Premium subscription is inactive.

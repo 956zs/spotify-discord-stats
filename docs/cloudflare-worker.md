@@ -87,6 +87,8 @@ You do not need to set `SPOTIFY_REFRESH_TOKEN` if you will authorize through
 npm run cf:d1:migrate:remote
 ```
 
+Migrations include the `album_image_url` column used by recap report artwork.
+
 ## Deploy
 
 ```bash
@@ -110,10 +112,20 @@ requires reauthorization again.
 ```text
 GET /admin/sync?token=YOUR_ADMIN_TOKEN
 GET /admin/stats?token=YOUR_ADMIN_TOKEN
+POST /admin/recap/weekly/send?token=YOUR_ADMIN_TOKEN
+POST /admin/recap/monthly/send?token=YOUR_ADMIN_TOKEN
+POST /admin/recap/monthly/send?token=YOUR_ADMIN_TOKEN&month=2026-06
 GET /health
 ```
 
+Scheduled recap reports are sent after the regular 10-minute sync loop when the
+configured local send time matches Monday 09:00 or the 1st day of the month at
+09:00 in `Asia/Taipei`.
+
 ## Import Spotify Export to D1
+
+Read [Backup, Rollback, and Spotify History Import](backup-rollback-and-import.md)
+before importing into remote D1.
 
 After Spotify sends the long-term streaming history export, extract it and run:
 

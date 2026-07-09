@@ -1,4 +1,20 @@
+import { playRowToSongStatus } from '../../shared/song.js';
 import { sinceIso } from '../../shared/time.js';
+
+export async function getWidgetStats(db, days) {
+  return {
+    ...(await getStats(db, days)),
+    lastPlayed: await getLastPlayedSong(db)
+  };
+}
+
+export async function getStatsRanges(db, daysList) {
+  const ranges = {};
+  for (const days of daysList) {
+    ranges[`${days}d`] = await getStats(db, days);
+  }
+  return ranges;
+}
 
 export async function getStats(db, days) {
   const since = sinceIso(days);
@@ -15,8 +31,32 @@ export async function getStats(db, days) {
     differentArtists: Number(artistSummary.different_artists ?? 0),
     differentAlbums: Number(summary.different_albums ?? 0),
     topAlbum: topAlbum?.album_name ?? 'unknown',
+    topAlbumImageUrl: topAlbum?.album_image_url ?? null,
     topAlbumPlays: Number(topAlbum?.plays ?? 0)
   };
+}
+
+export async function getLastPlayedSong(db) {
+  const row = await db
+    .prepare(`
+      SELECT
+        p.played_at,
+        p.track_name,
+        p.album_name,
+        p.album_image_url,
+        (
+          SELECT GROUP_CONCAT(pa.artist_name, ', ')
+          FROM play_artists pa
+          WHERE pa.played_at = p.played_at
+            AND pa.track_key = p.track_key
+        ) AS artist_names
+      FROM plays p
+      ORDER BY p.played_at_ms DESC
+      LIMIT 1
+    `)
+    .first();
+
+  return playRowToSongStatus(row);
 }
 
 async function getPlaySummary(db, since) {
@@ -48,7 +88,7 @@ async function getArtistSummary(db, since) {
 async function getTopAlbum(db, since) {
   return db
     .prepare(`
-      SELECT album_name, COUNT(*) AS plays
+      SELECT album_name, MAX(album_image_url) AS album_image_url, COUNT(*) AS plays
       FROM plays
       WHERE played_at >= ?
         AND album_name IS NOT NULL

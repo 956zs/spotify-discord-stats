@@ -1,13 +1,14 @@
 {
   "username": "My Spotify Stats",
-  "topHeroTitle": "4w on Spotify🧋",
+  "topHeroTitle": "✦ 4w on Spotify🧋",
   "during": "",
   "lastUpdatedPrefix": "last updated: ",
-  "mainTitle": "Last 4 Weeks Played:",
+  "mainTitle": "✦ Last 4 Weeks Played:",
   "fields": {
     "topHeroTitle": "top_hero_title",
     "during": "during",
     "lastUpdated": "last_updated",
+    "song": "song",
     "mainTitle": "main_title",
     "songsPlayed": "Songs_Played",
     "listeningTime": "Listening_Time",
