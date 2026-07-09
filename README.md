@@ -38,9 +38,10 @@ cp .env.example .env
 Fill `.env` for local development. Cloudflare production secrets are set with
 `wrangler secret put`.
 
-Useful docs:
+Deployment guides:
 
-- [Cloudflare Worker deployment](docs/cloudflare-worker.md)
+- [Cloudflare Worker deployment](docs/cloudflare-worker.md) - recommended, full feature target.
+- [VPS deployment](docs/vps-deployment.md) - Node process + SQLite, useful when you want to own the machine.
 - [Backup, rollback, and Spotify history import](docs/backup-rollback-and-import.md)
 - [Recap glossary](docs/recap-glossary.md)
 
@@ -72,7 +73,29 @@ The widget uses Last Played from Recently Played, not Now Playing. That keeps
 the sync at one Spotify API read every 10 minutes instead of polling real-time
 player state.
 
-## Cloudflare Setup
+## Deployment Choices
+
+Choose one path first. Do not run both against the same Discord widget unless
+you intentionally want two processes fighting over the same profile payload.
+
+| Feature | Cloudflare Worker + D1 | VPS Node + SQLite |
+| --- | --- | --- |
+| 10-minute Spotify sync | Yes | Yes |
+| Discord widget patch | Yes | Yes |
+| Spotify OAuth callback | Yes | Yes |
+| Reauthorization DM | Yes | Yes |
+| Weekly/monthly recap DM | Yes | Not scheduled yet |
+| Spotify export import | D1 import | SQLite import |
+| Backups | D1 export / Time Travel | SQLite file backup |
+
+Recommended default: use Cloudflare Worker + D1. It is the deployment this repo
+keeps fully wired for scheduled recaps, admin routes, D1 backup, and real-send
+testing.
+
+Use VPS when you want a plain Node process with a local SQLite file and you do
+not need Worker Cron or D1.
+
+## Cloudflare Worker Quick Start
 
 Log in:
 
@@ -121,6 +144,38 @@ https://spotify-stats.mimidlc.me/spotify/login?token=YOUR_ADMIN_TOKEN
 ```
 
 The callback stores the Spotify refresh token in D1.
+
+Full guide: [docs/cloudflare-worker.md](docs/cloudflare-worker.md).
+
+## VPS Quick Start
+
+VPS mode runs the local Node runtime:
+
+```bash
+npm install
+cp .env.example .env
+```
+
+Fill `.env`, then authorize Spotify:
+
+```bash
+npm run spotify:auth-url
+npm run spotify:token -- "PASTE_CODE_OR_CALLBACK_URL"
+```
+
+Run once:
+
+```bash
+npm run spotify:sync
+```
+
+Run continuously:
+
+```bash
+npm start
+```
+
+Full guide: [docs/vps-deployment.md](docs/vps-deployment.md).
 
 ## Widget Fields
 
@@ -251,7 +306,8 @@ npm run prototype:recap-demo
 
 ## Local Runtime
 
-Local Node/SQLite still works for development:
+Local Node/SQLite works for development and is the same runtime used by the VPS
+deployment:
 
 ```bash
 npm run spotify:auth-url

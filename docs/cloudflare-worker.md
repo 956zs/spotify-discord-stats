@@ -1,5 +1,7 @@
 # Cloudflare Worker Deployment
 
+This is the recommended deployment path for this project.
+
 This deploys the Spotify stats service to Cloudflare Workers:
 
 - Worker Cron syncs Spotify Recently Played every 10 minutes.
@@ -16,6 +18,39 @@ continue; the Worker logs the failure and skips the notification.
 Spotify artist genre enrichment is disabled because Spotify artist genre
 metadata is deprecated and unreliable for new apps. The default widget uses
 `Top_Album` instead.
+
+## When To Use This
+
+Use Worker deployment when you want the full feature set:
+
+- 10-minute scheduled sync with Worker Cron.
+- D1 storage and D1 backup/Time Travel.
+- Browser-based Spotify reauthorization through Worker routes.
+- Manual admin routes for sync, stats, and real recap DM sends.
+- Scheduled weekly/monthly recap DMs.
+
+Use [VPS deployment](vps-deployment.md) instead only if you want a plain Node
+process and local SQLite storage.
+
+## Fast Path
+
+```bash
+npm install
+wrangler login
+npm run cf:d1:create
+# Copy the returned database_id into wrangler.toml before continuing.
+npm run cf:d1:migrate:remote
+wrangler secret put DISCORD_TOKEN
+wrangler secret put SPOTIFY_CLIENT_SECRET
+wrangler secret put ADMIN_TOKEN
+npm run cf:deploy
+```
+
+After deploy, open:
+
+```text
+https://spotify-stats.mimidlc.me/spotify/login?token=YOUR_ADMIN_TOKEN
+```
 
 ## Required Cloudflare Auth
 
