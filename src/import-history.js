@@ -1,26 +1,33 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { exportRowToPlayRecords } from '../shared/play-records.js';
 import { upsertExportPlay } from './db.js';
 
-const targets = process.argv.slice(2);
-if (targets.length === 0) {
-  console.error('Usage: npm run spotify:import -- /path/to/json-or-directory');
+const options = parseArgs(process.argv.slice(2));
+if (options.targets.length === 0) {
+  usage();
   process.exit(1);
 }
 
 let files = [];
-for (const target of targets) {
+for (const target of options.targets) {
   files = files.concat(findJsonFiles(path.resolve(target)));
 }
 
 let seen = 0;
 let inserted = 0;
 for (const file of files) {
-  const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const json = parseJson(file);
+  if (!json) {
+    continue;
+  }
   const rows = Array.isArray(json) ? json : [];
   for (const row of rows) {
     seen += 1;
+    if (!isImportable(row)) {
+      continue;
+    }
     if (upsertExportPlay(row)) {
       inserted += 1;
     }
@@ -46,4 +53,53 @@ function findJsonFiles(target) {
     }
   }
   return results;
+}
+
+function parseJson(file) {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    console.log(`Skipping invalid JSON: ${file} (${error.message})`);
+    return null;
+  }
+}
+
+function isImportable(row) {
+  const records = exportRowToPlayRecords(row);
+  if (!records) {
+    return false;
+  }
+  return isWithinImportRange(records.play.playedAt);
+}
+
+function parseArgs(args) {
+  const parsed = { after: null, before: null, targets: [] };
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--after') {
+      parsed.after = parseBoundary('--after', args[++index]);
+    } else if (arg === '--before') {
+      parsed.before = parseBoundary('--before', args[++index]);
+    } else {
+      parsed.targets.push(arg);
+    }
+  }
+  return parsed;
+}
+
+function parseBoundary(name, value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`${name} must be a valid date or ISO timestamp`);
+  }
+  return date.toISOString();
+}
+
+function isWithinImportRange(playedAt) {
+  return (!options.after || playedAt >= options.after) && (!options.before || playedAt < options.before);
+}
+
+function usage() {
+  console.error(`Usage:
+  npm run spotify:import -- [--after ISO_DATE] [--before ISO_DATE] /path/to/json-or-directory`);
 }

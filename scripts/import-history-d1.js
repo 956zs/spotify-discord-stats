@@ -31,7 +31,10 @@ const importStartedAt = new Date().toISOString();
 console.log(`Import started at ${importStartedAt}`);
 
 for (const file of jsonFiles) {
-  const rows = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const rows = parseJsonRows(file);
+  if (!rows) {
+    continue;
+  }
   if (!Array.isArray(rows)) {
     console.log(`Skipping non-array JSON: ${file}`);
     continue;
@@ -92,6 +95,9 @@ function executeChunk() {
 function exportRowToSql(row) {
   const records = exportRowToPlayRecords(row);
   if (!records) {
+    return [];
+  }
+  if (!isWithinImportRange(records.play.playedAt)) {
     return [];
   }
 
@@ -165,6 +171,8 @@ function parseArgs(args) {
     remote: false,
     dryRun: false,
     batchSize: DEFAULT_BATCH_SIZE,
+    after: null,
+    before: null,
     targets: []
   };
 
@@ -180,6 +188,10 @@ function parseArgs(args) {
       parsed.dryRun = true;
     } else if (arg === '--batch-size') {
       parsed.batchSize = Number.parseInt(args[++index], 10);
+    } else if (arg === '--after') {
+      parsed.after = parseBoundary('--after', args[++index]);
+    } else if (arg === '--before') {
+      parsed.before = parseBoundary('--before', args[++index]);
     } else {
       parsed.targets.push(arg);
     }
@@ -190,6 +202,27 @@ function parseArgs(args) {
   }
 
   return parsed;
+}
+
+function parseJsonRows(file) {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    console.log(`Skipping invalid JSON: ${file} (${error.message})`);
+    return null;
+  }
+}
+
+function parseBoundary(name, value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`${name} must be a valid date or ISO timestamp`);
+  }
+  return date.toISOString();
+}
+
+function isWithinImportRange(playedAt) {
+  return (!options.after || playedAt >= options.after) && (!options.before || playedAt < options.before);
 }
 
 function sqlString(value) {
@@ -214,5 +247,6 @@ function usage() {
 Examples:
   npm run cf:import -- --local ~/Downloads/SpotifyData
   npm run cf:import -- --remote ~/Downloads/SpotifyData
+  npm run cf:import -- --remote --before 2026-07-05T00:00:00Z ~/Downloads/SpotifyData
   npm run cf:import -- --dry-run ~/Downloads/SpotifyData`);
 }

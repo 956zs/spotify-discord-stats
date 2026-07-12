@@ -86,6 +86,11 @@ Spotify can send two useful export shapes:
 The project importer supports both. The extended export is better for long-term
 recaps because it has album names and Spotify Track URI fields more often.
 
+One-year account data can overlap with rows already collected from the Spotify
+Web API. It usually has minute-level timestamps and no Spotify Track URI, so it
+cannot always deduplicate perfectly against API-synced rows. Use `--before` to
+stop the account-data import before your first API-synced play.
+
 Spotify usually sends a zip. Extract it locally. The importer scans nested
 folders and reads every `.json` file it can parse as an array.
 
@@ -135,6 +140,10 @@ The importer currently uses these fields when present:
 Podcast/video rows and local files without a usable track name and artist are
 skipped.
 
+Some Spotify account-data files are not useful JSON arrays for this app. The
+importer skips non-array JSON and logs invalid JSON files instead of importing
+them.
+
 For last-year account data, Spotify may not include album names or Spotify Track
 URIs. Those rows still import, but album-based reports are weaker until the same
 track appears from the Web API or a richer extended export.
@@ -147,6 +156,13 @@ First run a dry run. This writes SQL chunks but does not touch D1:
 npm run cf:import -- --remote --dry-run /path/to/extracted/spotify/export
 ```
 
+If the export overlaps with API-synced rows, add a cutoff. For example, if your
+first API row is `2026-07-05T13:02:33.723Z`:
+
+```bash
+npm run cf:import -- --remote --dry-run --before 2026-07-05T13:02:33.723Z /path/to/extracted/spotify/export
+```
+
 Then back up:
 
 ```bash
@@ -157,6 +173,12 @@ Then import:
 
 ```bash
 npm run cf:import -- --remote /path/to/extracted/spotify/export
+```
+
+Or with the same cutoff:
+
+```bash
+npm run cf:import -- --remote --before 2026-07-05T13:02:33.723Z /path/to/extracted/spotify/export
 ```
 
 The import command prints an `Import rollback marker`. Keep that exact timestamp
@@ -172,6 +194,12 @@ Check latest rows:
 
 ```bash
 /usr/bin/wrangler d1 execute spotify-discord-stats --remote --command "SELECT played_at, track_name, album_name, source FROM plays ORDER BY played_at_ms DESC LIMIT 10;"
+```
+
+Find the first API-synced row before choosing an import cutoff:
+
+```bash
+/usr/bin/wrangler d1 execute spotify-discord-stats --remote --command "SELECT MIN(played_at) AS first_api, MAX(played_at) AS last_api, COUNT(*) AS api_rows FROM plays WHERE source = 'spotify_api';"
 ```
 
 ## Roll Back Only One Export Import

@@ -247,6 +247,13 @@ Dry run:
 npm run cf:import -- --remote --dry-run /path/to/extracted/spotify/export
 ```
 
+If the export overlaps with rows already synced from the Spotify API, use a
+cutoff:
+
+```bash
+npm run cf:import -- --remote --dry-run --before 2026-07-05T13:02:33.723Z /path/to/extracted/spotify/export
+```
+
 Backup:
 
 ```bash
@@ -261,6 +268,11 @@ npm run cf:import -- --remote /path/to/extracted/spotify/export
 
 Imports deduplicate overlap by `played_at + track_key`. Re-running the same
 export should not double-count plays.
+
+One-year account-data exports usually do not include Spotify Track URI and use
+minute-level timestamps, so they may not deduplicate perfectly against rows that
+were already synced through the Web API. Prefer `--before` for the overlap
+window.
 
 ## Backup And Rollback
 
