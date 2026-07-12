@@ -72,7 +72,7 @@ function executeChunk() {
     tempDir,
     `chunk-${String(chunkIndex).padStart(CHUNK_INDEX_PAD_WIDTH, '0')}.sql`
   );
-  fs.writeFileSync(filePath, `BEGIN TRANSACTION;\n${statements.join('\n')}\nCOMMIT;\n`);
+  fs.writeFileSync(filePath, `${statements.join('\n')}\n`);
   statements = [];
 
   if (options.dryRun) {
