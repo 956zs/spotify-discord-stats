@@ -11,6 +11,14 @@ routes = [
 [triggers]
 crons = ["*/10 * * * *"]
 
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+head_sampling_rate = 1
+
 [vars]
 DISCORD_CLIENT_ID = "1523243855988658256"
 DISCORD_USER_ID = "586502118530351114"
