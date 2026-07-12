@@ -27,7 +27,7 @@ const defaultWidgetConfig = {
   topHeroTitle: '✦ 4w on Spotify🧋',
   during: '',
   lastUpdatedPrefix: 'last updated: ',
-  mainTitle: '✦ Last 4 Weeks Played:',
+  mainTitle: '✦ 4w plays:',
   fields: {
     topHeroTitle: 'top_hero_title',
     during: 'during',

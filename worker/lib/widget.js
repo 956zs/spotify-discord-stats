@@ -1,4 +1,5 @@
 import { appConfig, widgetConfig } from '../config.js';
+import { formatCount } from '../../shared/number.js';
 import { formatDateRange, formatLocalUpdatedAt, formatMinutes } from '../../shared/time.js';
 import { discordFetch } from './discord.js';
 import { requiredEnv } from './env.js';
@@ -12,12 +13,12 @@ export function buildWidgetPayload(stats) {
     widgetField(fields.during, formatDateRange(stats.since)),
     widgetField(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()} (UTC +8)`),
     widgetField(fields.song, stats.lastPlayed.value),
-    widgetField(fields.mainTitle, `${widgetConfig.mainTitle} ${stats.songsPlayed}`),
-    widgetField(fields.songsPlayed, String(stats.songsPlayed)),
+    widgetField(fields.mainTitle, `${widgetConfig.mainTitle} ${formatCount(stats.songsPlayed)}`),
+    widgetField(fields.songsPlayed, formatCount(stats.songsPlayed)),
     widgetField(fields.listeningTime, formatMinutes(stats.listeningMs)),
-    widgetField(fields.uniqueSongs, String(stats.uniqueSongs)),
-    widgetField(fields.differentArtists, String(stats.differentArtists)),
-    widgetField(fields.differentAlbums, String(stats.differentAlbums)),
+    widgetField(fields.uniqueSongs, formatCount(stats.uniqueSongs)),
+    widgetField(fields.differentArtists, formatCount(stats.differentArtists)),
+    widgetField(fields.differentAlbums, formatCount(stats.differentAlbums)),
     widgetField(fields.topAlbum, stats.topAlbum)
   ];
 

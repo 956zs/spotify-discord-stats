@@ -12,12 +12,11 @@ routes = [
 crons = ["*/10 * * * *"]
 
 [observability]
-enabled = true
+enabled = false
 
 [observability.logs]
-enabled = true
-invocation_logs = true
-head_sampling_rate = 1
+enabled = false
+invocation_logs = false
 
 [vars]
 DISCORD_CLIENT_ID = "1523243855988658256"

@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { appConfig, widgetConfig } from './config.js';
 import { env, requiredEnv } from './env.js';
 import { getState, setState } from './db.js';
+import { formatCount } from '../shared/number.js';
 import { formatDateRange, formatLocalUpdatedAt, formatMinutes } from './time.js';
 
 export function buildWidgetPayload(stats) {
@@ -11,12 +12,12 @@ export function buildWidgetPayload(stats) {
     field(fields.during, formatDateRange(stats.since)),
     field(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()} (UTC +8)`),
     field(fields.song, stats.lastPlayed.value),
-    field(fields.mainTitle, `${widgetConfig.mainTitle} ${stats.songsPlayed}`),
-    field(fields.songsPlayed, String(stats.songsPlayed)),
+    field(fields.mainTitle, `${widgetConfig.mainTitle} ${formatCount(stats.songsPlayed)}`),
+    field(fields.songsPlayed, formatCount(stats.songsPlayed)),
     field(fields.listeningTime, formatMinutes(stats.listeningMs)),
-    field(fields.uniqueSongs, String(stats.uniqueSongs)),
-    field(fields.differentArtists, String(stats.differentArtists)),
-    field(fields.differentAlbums, String(stats.differentAlbums)),
+    field(fields.uniqueSongs, formatCount(stats.uniqueSongs)),
+    field(fields.differentArtists, formatCount(stats.differentArtists)),
+    field(fields.differentAlbums, formatCount(stats.differentAlbums)),
     field(fields.topAlbum, stats.topAlbum)
   ];
 
