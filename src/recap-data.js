@@ -178,9 +178,10 @@ function summarySql() {
   `;
 }
 
+// See getStats in db.js for why artist_key carries a unary +.
 function artistSummarySql() {
   return `
-    SELECT COUNT(DISTINCT artist_key) AS different_artists
+    SELECT COUNT(DISTINCT +artist_key) AS different_artists
     FROM play_artists
     WHERE played_at >= ? AND played_at < ?
   `;

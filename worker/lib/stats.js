@@ -74,10 +74,14 @@ async function getPlaySummary(db, since) {
     .first();
 }
 
+// The unary + on artist_key is deliberate. Written as COUNT(DISTINCT artist_key),
+// SQLite prefers an artist_key-ordered index so it can skip the DISTINCT temp b-tree,
+// and ends up scanning every row in the table. The + hides the column from that
+// optimisation, so the planner uses the played_at index and reads only the window.
 async function getArtistSummary(db, since) {
   return db
     .prepare(`
-      SELECT COUNT(DISTINCT artist_key) AS different_artists
+      SELECT COUNT(DISTINCT +artist_key) AS different_artists
       FROM play_artists
       WHERE played_at >= ?
     `)
