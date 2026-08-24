@@ -69,8 +69,15 @@ function migrate(db) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_plays_played_at ON plays (played_at);
-    CREATE INDEX IF NOT EXISTS idx_play_artists_artist_key ON play_artists (artist_key);
+    CREATE INDEX IF NOT EXISTS idx_plays_track_key_played_at ON plays (track_key, played_at);
+    CREATE INDEX IF NOT EXISTS idx_plays_played_at_ms ON plays (played_at_ms);
+    CREATE INDEX IF NOT EXISTS idx_play_artists_played_at_artist_key
+      ON play_artists (played_at, artist_key, artist_name);
+    CREATE INDEX IF NOT EXISTS idx_play_artists_track_key_played_at
+      ON play_artists (track_key, played_at, artist_name);
     CREATE INDEX IF NOT EXISTS idx_artists_artist_id ON artists (artist_id);
+
+    DROP INDEX IF EXISTS idx_play_artists_artist_key;
   `);
 
   ensureColumn(db, 'plays', 'album_image_url', 'TEXT');
@@ -226,7 +233,7 @@ export function getStats(days) {
 
   const artistSummary = db
     .prepare(`
-      SELECT COUNT(DISTINCT artist_key) AS different_artists
+      SELECT COUNT(DISTINCT +artist_key) AS different_artists
       FROM play_artists
       WHERE played_at >= ?
     `)
