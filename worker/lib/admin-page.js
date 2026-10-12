@@ -107,16 +107,13 @@ pre { overflow:auto; max-height:320px; font-size:11px; background:var(--bg); pad
 dl { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:0; font-size:13px; }
 dt { color:var(--muted); }
 dd { margin:0; }
+.slot { border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:10px; }
+.slot-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.slot-head strong { font-size:13px; }
+.slot-field { color:var(--muted); font-size:11px; flex:1; }
+.slot-head button { padding:4px 10px; }
+.row3 { display:grid; grid-template-columns:2fr 1fr 1fr; gap:10px; }
 `;
-
-const STAT_ROWS = [
-  ['songsPlayed', 'Songs Played'],
-  ['listeningTime', 'Listening Time'],
-  ['uniqueSongs', 'Unique Songs'],
-  ['differentArtists', 'Different Artists'],
-  ['differentAlbums', 'Different Albums'],
-  ['topAlbum', 'Top Album']
-];
 
 const ADMIN_BODY = `<main>
   <div class="actions header">
@@ -145,18 +142,16 @@ const ADMIN_BODY = `<main>
         </section>
         <section>
           <h2>Widget 文字</h2>
-          <p class="hint">可用變數：<code>{range}</code> → 4w / all time、<code>{rangeLong}</code> → 4 Weeks / All Time、<code>{count}</code> → 播放次數；數值欄另有 <code>{value}</code>。</p>
+          <p class="hint">可用變數：<code>{range}</code> → 4w / all time、<code>{rangeLong}</code> → 4 Weeks / All Time、<code>{count}</code> → 播放次數；統計格的數值欄另有 <code>{value}</code>。統計格內的變數套用該格自己的區間。</p>
           <label>Username<input name="username" maxlength="80"></label>
           <label>Hero 標題（top_hero_title）<input name="topHeroTitle" maxlength="256"></label>
           <label>主標題（main_title）<input name="mainTitle" maxlength="256"></label>
           <label>更新時間前綴（last_updated）<input name="lastUpdatedPrefix" maxlength="256"></label>
         </section>
         <section>
-          <h2>統計欄位</h2>
-          ${STAT_ROWS.map(([key, name]) => `<div class="row">
-            <label>${name} 標籤<input name="${key}.label" maxlength="256"></label>
-            <label>${name} 數值<input name="${key}.value" maxlength="256"></label>
-          </div>`).join('')}
+          <h2>統計格</h2>
+          <p class="hint">每格可選要顯示的統計與區間；用 ↑ ↓ 調整順序。換統計項目時，若標籤還是預設文字會自動換成新的預設標籤。</p>
+          <div id="slots"></div>
         </section>
         <div class="actions">
           <button type="submit" class="primary" id="saveBtn">儲存並推送到 Discord</button>
@@ -199,10 +194,15 @@ const ADMIN_BODY = `<main>
 </main>`;
 
 const ADMIN_SCRIPT = `
-const STAT_KEYS = ${JSON.stringify(STAT_ROWS.map(([key]) => key))};
 const PRESET_DAYS = ['7', '28', '90', '365'];
+const SLOT_RANGES = [
+  ['global', '跟隨全域'], ['7', '7 天'], ['28', '28 天'], ['90', '90 天'], ['180', '180 天'],
+  ['365', '365 天'], ['all', '全部歷史'], ['custom', '自訂天數']
+];
 const form = document.getElementById('settings');
 let defaults = null;
+let metrics = [];
+let fieldMap = null;
 let previewTimer = null;
 let previewSeq = 0;
 
@@ -244,19 +244,12 @@ function fillForm(settings) {
   for (const name of ['username', 'topHeroTitle', 'mainTitle', 'lastUpdatedPrefix']) {
     input(name).value = settings.widget[name];
   }
-  for (const key of STAT_KEYS) {
-    input(key + '.label').value = settings.widget.stats[key].label;
-    input(key + '.value').value = settings.widget.stats[key].value;
-  }
+  renderSlots(settings.widget.slots);
   toggleCustomDays();
 }
 
 function readForm() {
   const choice = input('rangeChoice').value;
-  const stats = {};
-  for (const key of STAT_KEYS) {
-    stats[key] = { label: input(key + '.label').value, value: input(key + '.value').value };
-  }
   return {
     statsDays: choice === 'all' ? 'all' : Number(choice === 'custom' ? input('customDays').value : choice),
     recapEnabled: input('recapEnabled').checked,
@@ -265,9 +258,125 @@ function readForm() {
       topHeroTitle: input('topHeroTitle').value,
       mainTitle: input('mainTitle').value,
       lastUpdatedPrefix: input('lastUpdatedPrefix').value,
-      stats
+      slots: readSlots()
     }
   };
+}
+
+function metricLabel(id) {
+  return metrics.find((metric) => metric.id === id)?.label ?? '';
+}
+
+function element(tag, props = {}, children = []) {
+  const el = document.createElement(tag);
+  Object.assign(el, props);
+  el.append(...children);
+  return el;
+}
+
+function labeled(text, control) {
+  return element('label', {}, [text, control]);
+}
+
+function metricSelect(selected) {
+  const select = element('select', { className: 'slot-metric' });
+  const groups = new Map();
+  for (const metric of metrics) {
+    if (!groups.has(metric.group)) {
+      groups.set(metric.group, element('optgroup', { label: metric.group }));
+      select.append(groups.get(metric.group));
+    }
+    groups.get(metric.group).append(element('option', { value: metric.id, textContent: metric.name }));
+  }
+  select.value = selected;
+  select.dataset.previous = selected;
+  return select;
+}
+
+function rangeSelect(range) {
+  const select = element('select', { className: 'slot-range' });
+  for (const [value, text] of SLOT_RANGES) {
+    select.append(element('option', { value, textContent: text }));
+  }
+  const known = SLOT_RANGES.some(([value]) => value === String(range));
+  select.value = known ? String(range) : 'custom';
+  return select;
+}
+
+function renderSlots(slots) {
+  const container = $('slots');
+  container.replaceChildren();
+  slots.forEach((slot, index) => {
+    const custom = element('input', {
+      className: 'slot-custom', type: 'number', min: 1, max: 3650, step: 1,
+      value: typeof slot.range === 'number' ? slot.range : ''
+    });
+    const range = rangeSelect(slot.range);
+    const customWrap = labeled('自訂天數', custom);
+    customWrap.classList.toggle('hidden', range.value !== 'custom');
+    const up = element('button', { type: 'button', textContent: '↑', disabled: index === 0, title: '上移' });
+    const down = element('button', { type: 'button', textContent: '↓', disabled: index === slots.length - 1, title: '下移' });
+    up.addEventListener('click', () => moveSlot(index, -1));
+    down.addEventListener('click', () => moveSlot(index, 1));
+    const field = fieldMap?.slots?.[index]?.value ?? '';
+
+    container.append(element('div', { className: 'slot' }, [
+      element('div', { className: 'slot-head' }, [
+        element('strong', { textContent: '第 ' + (index + 1) + ' 格' }),
+        element('span', { className: 'slot-field', textContent: field }),
+        up,
+        down
+      ]),
+      element('div', { className: 'row3' }, [
+        labeled('統計項目', metricSelect(slot.metric)),
+        labeled('區間', range),
+        customWrap
+      ]),
+      element('div', { className: 'row' }, [
+        labeled('標籤', element('input', { className: 'slot-label', maxLength: 256, value: slot.label })),
+        labeled('數值格式', element('input', { className: 'slot-value', maxLength: 256, value: slot.value }))
+      ])
+    ]));
+  });
+}
+
+function readSlots() {
+  return [...$('slots').children].map((row) => {
+    const range = row.querySelector('.slot-range').value;
+    return {
+      metric: row.querySelector('.slot-metric').value,
+      range: range === 'global' || range === 'all'
+        ? range
+        : Number(range === 'custom' ? row.querySelector('.slot-custom').value : range),
+      label: row.querySelector('.slot-label').value,
+      value: row.querySelector('.slot-value').value
+    };
+  });
+}
+
+function moveSlot(index, offset) {
+  const slots = readSlots();
+  const target = index + offset;
+  [slots[index], slots[target]] = [slots[target], slots[index]];
+  renderSlots(slots);
+  schedulePreview();
+}
+
+// Swap in the new metric's default label unless the user already customised it.
+function onSlotChange(event) {
+  const row = event.target.closest('.slot');
+  if (!row) return;
+  if (event.target.classList.contains('slot-metric')) {
+    const label = row.querySelector('.slot-label');
+    const previous = event.target.dataset.previous;
+    if (label.value.trim() === '' || label.value === metricLabel(previous)) {
+      label.value = metricLabel(event.target.value);
+    }
+    event.target.dataset.previous = event.target.value;
+  }
+  if (event.target.classList.contains('slot-range')) {
+    row.querySelector('.slot-custom').closest('label').classList.toggle('hidden', event.target.value !== 'custom');
+  }
 }
 
 function toggleCustomDays() {
@@ -284,16 +393,11 @@ function renderPreview(payload, map) {
   $('pMain').textContent = fields[map.mainTitle];
   const statsEl = $('pStats');
   statsEl.replaceChildren();
-  for (const key of STAT_KEYS) {
-    const cell = document.createElement('div');
-    const value = document.createElement('div');
-    const label = document.createElement('div');
-    value.className = 'stat-value';
-    label.className = 'stat-label';
-    value.textContent = fields[map[key]];
-    label.textContent = fields[map.labels[key]];
-    cell.append(value, label);
-    statsEl.append(cell);
+  for (const slot of map.slots) {
+    statsEl.append(element('div', {}, [
+      element('div', { className: 'stat-value', textContent: fields[slot.value] ?? '' }),
+      element('div', { className: 'stat-label', textContent: fields[slot.label] ?? '' })
+    ]));
   }
   $('pJson').textContent = JSON.stringify({ username: payload.username, data: payload.data }, null, 2);
 }
@@ -366,10 +470,13 @@ async function runAction(button, path, confirmText) {
 async function loadState() {
   const data = await api('/admin/api/state');
   defaults = data.defaults;
+  metrics = data.metrics;
+  fieldMap = data.fields;
   renderStatus(data.status);
   return data;
 }
 
+form.addEventListener('change', onSlotChange);
 form.addEventListener('input', () => { toggleCustomDays(); schedulePreview(); });
 form.addEventListener('submit', (event) => { event.preventDefault(); save(true); });
 $('saveOnlyBtn').addEventListener('click', () => save(false));
