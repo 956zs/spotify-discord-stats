@@ -123,12 +123,46 @@ wrangler secret put ADMIN_TOKEN
 `ADMIN_TOKEN` protects these routes:
 
 ```text
+/admin                      (settings page, signs in with ADMIN_TOKEN)
 /spotify/login
 /admin/sync
 /admin/stats
 /admin/recap/weekly/send
 /admin/recap/monthly/send
 ```
+
+The older routes accept either `?token=ADMIN_TOKEN` or the session cookie set by
+the `/admin` sign-in.
+
+## Admin Settings Page
+
+Open `https://spotify-stats.mimidlc.me/admin` and sign in with `ADMIN_TOKEN`.
+The page edits settings at runtime, with no redeploy:
+
+- Stats range: 7 / 28 / 90 / 365 days, a custom number of days, or all time.
+- Widget copy: username, hero title, main title, last-updated prefix.
+- Each stat's label and value text.
+- Weekly/monthly recap DMs on or off.
+
+It also shows a live preview, a manual sync button, recap test sends, and the
+Spotify authorization status.
+
+Text fields accept placeholders: `{range}` (`4w`, `90d`, `all time`),
+`{rangeLong}` (`4 Weeks`, `All Time`), `{count}` (songs played), and `{value}`
+in stat value fields.
+
+Saved settings live in D1 (`app_state.admin_settings`) and override
+`config/app.json` / `config/widget.json`, which stay as the defaults. Signing in
+sets a 30-day session cookie signed with `ADMIN_TOKEN`, so rotating the token
+signs every session out.
+
+Stat labels are sent as Discord widget fields such as `Songs_Played_Label`. In
+the Discord widget editor, each stat's Label must use Value Type `User Data`
+with those field names (see `config/widget.json` `fields.labels`).
+
+All-time stats read every stored play, so the Worker caches them and only
+recomputes when a newer play arrives. After importing older history, press the
+sync button on the admin page to refresh the totals.
 
 Apply migrations and deploy:
 

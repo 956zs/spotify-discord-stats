@@ -1,11 +1,25 @@
-import { appConfig } from './config.js';
-import { requireAdminToken } from './lib/env.js';
-import { json } from './lib/http.js';
+import { appConfig, widgetConfig } from './config.js';
+import { MS_PER_DAY } from '../shared/time.js';
+import {
+  checkAdminToken,
+  clearSessionCookie,
+  createSessionCookie,
+  isAdminRequest,
+  requireAdmin,
+  requireSameOrigin,
+  requireSameOriginJson
+} from './lib/admin-auth.js';
+import { adminPageResponse, loginPageResponse } from './lib/admin-page.js';
+import { HttpError, json } from './lib/http.js';
 import { startSpotifyLogin, handleSpotifyCallback } from './lib/oauth.js';
 import { runDueRecapReports, sendMonthlyRecap, sendWeeklyRecap } from './lib/recap-delivery.js';
 import { runSpotifyReauthReminder } from './lib/reminder.js';
+import { getDefaultSettings, loadSettings, parseSettingsInput, saveSettings } from './lib/settings.js';
+import { getSpotifyRefreshTokenIssuedAt } from './lib/spotify.js';
+import { getState } from './lib/state.js';
 import { syncOnce } from './lib/sync.js';
 import { getStatsRanges, getWidgetStats } from './lib/stats.js';
+import { buildWidgetPayload } from './lib/widget.js';
 
 export async function handleRequest(request, env) {
   const url = new URL(request.url);
@@ -15,7 +29,7 @@ export async function handleRequest(request, env) {
   }
 
   if (url.pathname === '/spotify/login') {
-    requireAdminToken(url, env);
+    await requireAdmin(request, url, env);
     return startSpotifyLogin(env);
   }
 
@@ -23,27 +37,46 @@ export async function handleRequest(request, env) {
     return handleSpotifyCallback(url, env);
   }
 
+  if (url.pathname === '/admin' || url.pathname === '/admin/') {
+    return (await isAdminRequest(request, url, env)) ? adminPageResponse() : loginPageResponse();
+  }
+
+  if (url.pathname === '/admin/login') {
+    return handleLogin(request, url, env);
+  }
+
+  if (url.pathname === '/admin/logout') {
+    requirePost(request);
+    return redirect('/admin', clearSessionCookie());
+  }
+
+  if (url.pathname.startsWith('/admin/api/')) {
+    await requireAdmin(request, url, env);
+    return handleAdminApi(request, url, env);
+  }
+
   if (url.pathname === '/admin/sync') {
-    requireAdminToken(url, env);
-    return json(await syncOnce(env, { forcePatch: true, includeStatsRanges: true }));
+    await requireAdmin(request, url, env);
+    return json(await syncOnce(env, { forcePatch: true, refreshStats: true, includeStatsRanges: true }));
   }
 
   if (url.pathname === '/admin/stats') {
-    requireAdminToken(url, env);
-    const stats = await getWidgetStats(env.DB, appConfig.statsDays);
+    await requireAdmin(request, url, env);
+    const settings = await loadSettings(env.DB);
+    const stats = await getWidgetStats(env.DB, settings.statsDays);
     const statsRanges = await getStatsRanges(env.DB, appConfig.statsRangeDays);
     return json({ ...stats, statsRanges });
   }
 
   if (url.pathname === '/admin/recap/weekly/send') {
     requirePost(request);
-    requireAdminToken(url, env);
+    await requireAdmin(request, url, env);
     return json(await sendWeeklyRecap(env));
   }
 
   if (url.pathname === '/admin/recap/monthly/send') {
     requirePost(request);
-    requireAdminToken(url, env);
+    await requireAdmin(request, url, env);
     return json(await sendMonthlyRecap(env, { month: url.searchParams.get('month') }));
   }
 
@@ -63,6 +96,82 @@ export async function handleScheduled(env, now = new Date()) {
 
   const recap = await runDueRecapReports(env, now);
   console.log('recap reports', recap);
+}
+
+async function handleLogin(request, url, env) {
+  requirePost(request);
+  requireSameOrigin(request, url);
+
+  const form = await request.formData();
+  if (!checkAdminToken(form.get('token'), env)) {
+    return loginPageResponse(401, true);
+  }
+  return redirect('/admin', await createSessionCookie(env));
+}
+
+async function handleAdminApi(request, url, env) {
+  if (url.pathname === '/admin/api/state' && request.method === 'GET') {
+    const settings = await loadSettings(env.DB);
+    const stats = await getWidgetStats(env.DB, settings.statsDays);
+    return json({
+      settings,
+      defaults: getDefaultSettings(),
+      payload: buildWidgetPayload(stats, settings),
+      fields: widgetConfig.fields,
+      status: await adminStatus(env)
+    });
+  }
+
+  requirePost(request);
+  requireSameOriginJson(request, url);
+  const body = await readJson(request);
+
+  if (url.pathname === '/admin/api/preview') {
+    const settings = parseSettingsInput(body.settings);
+    const stats = await getWidgetStats(env.DB, settings.statsDays);
+    return json({ payload: buildWidgetPayload(stats, settings), fields: widgetConfig.fields });
+  }
+
+  if (url.pathname === '/admin/api/settings') {
+    return json({ settings: await saveSettings(env.DB, body.settings) });
+  }
+
+  if (url.pathname === '/admin/api/push') {
+    return json(await syncOnce(env, { forcePatch: true, refreshStats: true }));
+  }
+
+  return json({ error: 'not found' }, 404);
+}
+
+async function adminStatus(env) {
+  const issuedAt = await getSpotifyRefreshTokenIssuedAt(env);
+  let tokenDaysLeft = null;
+  if (issuedAt && !Number.isNaN(Date.parse(issuedAt))) {
+    const expiresAt = Date.parse(issuedAt) + appConfig.spotifyRefreshTokenValidDays * MS_PER_DAY;
+    tokenDaysLeft = `${Math.ceil((expiresAt - Date.now()) / MS_PER_DAY)} 天`;
+  }
+
+  return [
+    ['Spotify 授權剩餘', tokenDaysLeft],
+    ['Spotify 授權時間', issuedAt],
+    ['上次推送 Discord', await getState(env.DB, 'discord_widget_last_patched_at')]
+  ];
+}
+
+async function readJson(request) {
+  try {
+    const body = await request.json();
+    return body ?? {};
+  } catch {
+    throw new HttpError('invalid JSON body', 400);
+  }
+}
+
+function redirect(location, cookie) {
+  return new Response(null, {
+    status: 303,
+    headers: { Location: location, 'Set-Cookie': cookie, 'Cache-Control': 'no-store' }
+  });
 }
 
 function requirePost(request) {
