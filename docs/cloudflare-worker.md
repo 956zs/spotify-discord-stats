@@ -111,7 +111,9 @@ wrangler secret put SPOTIFY_CLIENT_SECRET
 wrangler secret put ADMIN_TOKEN
 ```
 
-`ADMIN_TOKEN` protects `/spotify/login`, `/admin/sync`, and `/admin/stats`.
+`ADMIN_TOKEN` protects `/admin` (the settings page), `/spotify/login`, and the
+`/admin/*` routes. The settings page signs in once with the token and keeps a
+session cookie; the other routes also accept `?token=`.
 
 You do not need to set `SPOTIFY_REFRESH_TOKEN` if you will authorize through
 `/spotify/login` after deploy. The Worker stores the refresh token in D1.
@@ -122,7 +124,9 @@ You do not need to set `SPOTIFY_REFRESH_TOKEN` if you will authorize through
 npm run cf:d1:migrate:remote
 ```
 
-Migrations include the `album_image_url` column used by recap report artwork.
+Migrations include the `album_image_url` column used by recap report artwork,
+read-path indexes (`0003`), and the artist first-play index used by the "new
+artists" widget metric (`0004`).
 
 ## Deploy
 
@@ -145,6 +149,7 @@ requires reauthorization again.
 ## Manual Admin Routes
 
 ```text
+GET /admin                      (settings page, sign in with ADMIN_TOKEN)
 GET /admin/sync?token=YOUR_ADMIN_TOKEN
 GET /admin/stats?token=YOUR_ADMIN_TOKEN
 POST /admin/recap/weekly/send?token=YOUR_ADMIN_TOKEN

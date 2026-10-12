@@ -12,6 +12,7 @@ runtime is still available for development and migration work.
 
 - Stores Spotify play history in SQLite/D1.
 - Patches Discord application widget dynamic fields.
+- Admin page (`/admin`) to pick the widget's stats, ranges, and copy without a redeploy.
 - Shows the last played track from Spotify Recently Played as `song`.
 - Calculates 7, 28, and 90 day stats.
 - Sends Discord DM recap reports with Components v2.
@@ -118,6 +119,14 @@ Set Worker secrets:
 wrangler secret put DISCORD_TOKEN
 wrangler secret put SPOTIFY_CLIENT_SECRET
 wrangler secret put ADMIN_TOKEN
+```
+
+Give only the name; Wrangler then prompts for the value. Secrets cannot be read
+back later, so keep `ADMIN_TOKEN` somewhere safe. To generate and set one in a
+single step (bash/zsh; in fish use `set -l TOKEN (openssl rand -hex 32)`):
+
+```bash
+TOKEN=$(openssl rand -hex 32); echo "$TOKEN"; printf %s "$TOKEN" | npx wrangler secret put ADMIN_TOKEN; unset TOKEN
 ```
 
 `ADMIN_TOKEN` protects these routes:
@@ -234,19 +243,29 @@ Full guide: [docs/vps-deployment.md](docs/vps-deployment.md).
 ## Widget Fields
 
 The Discord widget editor Data Field names must match
-[config/widget.json](config/widget.json):
+[config/widget.json](config/widget.json) `fields`:
 
 - `top_hero_title`
 - `during`
 - `last_updated`
 - `song`
 - `main_title`
-- `Songs_Played`
-- `Listening_Time`
-- `Unique_Songs`
-- `Different_Artists`
-- `Different_Albums`
-- `Top_Album`
+
+The six stats each use a value field and a label field. In the widget editor,
+set both the stat's Value and its Label to Value Type `User Data`:
+
+| Stat | Value field | Label field |
+| --- | --- | --- |
+| #1 | `Songs_Played` | `Songs_Played_Label` |
+| #2 | `Listening_Time` | `Listening_Time_Label` |
+| #3 | `Unique_Songs` | `Unique_Songs_Label` |
+| #4 | `Different_Artists` | `Different_Artists_Label` |
+| #5 | `Different_Albums` | `Different_Albums_Label` |
+| #6 | `Top_Album` | `Top_Album_Label` |
+
+These names are fixed slots: what each slot shows is chosen on the admin page,
+so `Songs_Played` may end up holding a top artist. Turning on the Label's
+Fallback in the editor keeps the card readable before the first sync.
 
 The `song` field is compact by design, for example:
 
