@@ -1,35 +1,16 @@
 import { appConfig, widgetConfig } from '../config.js';
-import { formatCount } from '../../shared/number.js';
-import { formatDateRange, formatLocalUpdatedAt, formatMinutes } from '../../shared/time.js';
+import { buildWidgetPayload as buildPayload } from '../../shared/widget-payload.js';
 import { discordFetch } from './discord.js';
 import { requiredEnv } from './env.js';
 import { sha256 } from './crypto.js';
 import { getState, setState } from './state.js';
 
-export function buildWidgetPayload(stats) {
-  const fields = widgetConfig.fields;
-  const dynamic = [
-    widgetField(fields.topHeroTitle, widgetConfig.topHeroTitle),
-    widgetField(fields.during, formatDateRange(stats.since)),
-    widgetField(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()} (UTC +8)`),
-    widgetField(fields.song, stats.lastPlayed.value),
-    widgetField(fields.mainTitle, `${widgetConfig.mainTitle} ${formatCount(stats.songsPlayed)}`),
-    widgetField(fields.songsPlayed, formatCount(stats.songsPlayed)),
-    widgetField(fields.listeningTime, formatMinutes(stats.listeningMs)),
-    widgetField(fields.uniqueSongs, formatCount(stats.uniqueSongs)),
-    widgetField(fields.differentArtists, formatCount(stats.differentArtists)),
-    widgetField(fields.differentAlbums, formatCount(stats.differentAlbums)),
-    widgetField(fields.topAlbum, stats.topAlbum)
-  ];
-
-  return {
-    username: widgetConfig.username,
-    data: { dynamic }
-  };
+export function buildWidgetPayload(stats, settings, now = new Date()) {
+  return buildPayload(stats, settings.widget, widgetConfig.fields, now);
 }
 
-export async function patchDiscordWidget(env, stats, options = {}) {
-  const payload = buildWidgetPayload(stats);
+export async function patchDiscordWidget(env, stats, settings, options = {}) {
+  const payload = buildWidgetPayload(stats, settings);
   const hash = await sha256(JSON.stringify(payload));
 
   if (await shouldSkipPatch(env.DB, hash, options)) {
@@ -53,13 +34,6 @@ export async function patchDiscordWidget(env, stats, options = {}) {
   await setState(env.DB, 'discord_widget_payload_hash', hash);
   await setState(env.DB, 'discord_widget_last_patched_at', new Date().toISOString());
   return { patched: true, skipped: false };
-}
-
-function widgetField(name, value) {
-  if (!name) {
-    throw new Error('Widget field name is missing. Check config/widget.json.');
-  }
-  return { type: 1, name, value };
 }
 
 async function shouldSkipPatch(db, hash, options) {

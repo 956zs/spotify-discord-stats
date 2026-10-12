@@ -2,6 +2,7 @@ import { appConfig } from '../config.js';
 import { renderRecapMessages } from '../../shared/recap-renderer.js';
 import { getMonthRecapData, getMonthlyRecapData, getWeeklyRecapData } from './recap-data.js';
 import { sendDiscordDmPayloads } from './discord.js';
+import { loadSettings } from './settings.js';
 import { getState, setState } from './state.js';
 
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -11,7 +12,8 @@ const WEEKLY_REPORT = 'weekly';
 const MONTHLY_REPORT = 'monthly';
 
 export async function runDueRecapReports(env, now = new Date()) {
-  if (!appConfig.recapReports?.enabled) {
+  const settings = await loadSettings(env.DB);
+  if (!settings.recapEnabled) {
     return { sent: 0, skipped: true, reason: 'disabled', results: [] };
   }
 

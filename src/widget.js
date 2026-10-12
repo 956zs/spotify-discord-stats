@@ -2,36 +2,13 @@ import crypto from 'node:crypto';
 import { appConfig, widgetConfig } from './config.js';
 import { env, requiredEnv } from './env.js';
 import { getState, setState } from './db.js';
-import { formatCount } from '../shared/number.js';
-import { formatDateRange, formatLocalUpdatedAt, formatMinutes } from './time.js';
+import { buildWidgetPayload as buildPayload } from '../shared/widget-payload.js';
+import { defaultSettings } from '../shared/widget-settings.js';
 
-export function buildWidgetPayload(stats) {
-  const fields = widgetConfig.fields;
-  const dynamic = [
-    field(fields.topHeroTitle, widgetConfig.topHeroTitle),
-    field(fields.during, formatDateRange(stats.since)),
-    field(fields.lastUpdated, `${widgetConfig.lastUpdatedPrefix}${formatLocalUpdatedAt()} (UTC +8)`),
-    field(fields.song, stats.lastPlayed.value),
-    field(fields.mainTitle, `${widgetConfig.mainTitle} ${formatCount(stats.songsPlayed)}`),
-    field(fields.songsPlayed, formatCount(stats.songsPlayed)),
-    field(fields.listeningTime, formatMinutes(stats.listeningMs)),
-    field(fields.uniqueSongs, formatCount(stats.uniqueSongs)),
-    field(fields.differentArtists, formatCount(stats.differentArtists)),
-    field(fields.differentAlbums, formatCount(stats.differentAlbums)),
-    field(fields.topAlbum, stats.topAlbum)
-  ];
-
-  return {
-    username: widgetConfig.username,
-    data: { dynamic }
-  };
-}
-
-function field(name, value) {
-  if (!name) {
-    throw new Error('Widget field name is missing. Check config/widget.json.');
-  }
-  return { type: 1, name, value };
+// The Node runtime has no admin page, so its settings are the config file defaults.
+export function buildWidgetPayload(stats, now = new Date()) {
+  const settings = defaultSettings(appConfig, widgetConfig);
+  return buildPayload(stats, settings.widget, widgetConfig.fields, now);
 }
 
 export async function patchDiscordWidget(stats, options = {}) {

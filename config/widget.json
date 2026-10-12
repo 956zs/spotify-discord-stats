@@ -1,9 +1,16 @@
 {
   "username": "My Spotify Stats",
-  "topHeroTitle": "✦ 4w on Spotify🧋",
-  "during": "",
+  "topHeroTitle": "✦ {range} on Spotify🧋",
   "lastUpdatedPrefix": "last updated: ",
-  "mainTitle": "✦ 4w plays:",
+  "mainTitle": "✦ {range} plays: {count}",
+  "stats": {
+    "songsPlayed": { "label": "Total Songs Played", "value": "{value}" },
+    "listeningTime": { "label": "Total Listening Time", "value": "{value}" },
+    "uniqueSongs": { "label": "Unique Songs", "value": "{value}" },
+    "differentArtists": { "label": "Different Artists", "value": "{value}" },
+    "differentAlbums": { "label": "Different Albums", "value": "{value}" },
+    "topAlbum": { "label": "Top Album", "value": "{value}" }
+  },
   "fields": {
     "topHeroTitle": "top_hero_title",
     "during": "during",
@@ -15,6 +22,14 @@
     "uniqueSongs": "Unique_Songs",
     "differentArtists": "Different_Artists",
     "differentAlbums": "Different_Albums",
-    "topAlbum": "Top_Album"
+    "topAlbum": "Top_Album",
+    "labels": {
+      "songsPlayed": "Songs_Played_Label",
+      "listeningTime": "Listening_Time_Label",
+      "uniqueSongs": "Unique_Songs_Label",
+      "differentArtists": "Different_Artists_Label",
+      "differentAlbums": "Different_Albums_Label",
+      "topAlbum": "Top_Album_Label"
+    }
   }
 }
