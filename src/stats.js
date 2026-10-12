@@ -1,6 +1,7 @@
 import { appConfig } from './config.js';
 import { getLastPlayedSong, getStats } from './db.js';
 import { formatMinutes } from './time.js';
+import { isAllTime } from '../shared/widget-settings.js';
 
 export function getConfiguredStats() {
   return {
@@ -23,7 +24,7 @@ export function getStatsRanges(daysList) {
 
 export function formatStats(stats) {
   return [
-    `Range: last ${stats.days} days`,
+    isAllTime(stats.days) ? 'Range: all time' : `Range: last ${stats.days} days`,
     `Songs played: ${stats.songsPlayed}`,
     `Listening time: ${formatMinutes(stats.listeningMs)}`,
     `Unique songs: ${stats.uniqueSongs}`,

@@ -5,6 +5,7 @@ import { env } from './env.js';
 import { exportRowToPlayRecords, spotifyItemToPlayRecords } from '../shared/play-records.js';
 import { playRowToSongStatus } from '../shared/song.js';
 import { nowIso, sinceIso } from './time.js';
+import { isAllTime } from '../shared/widget-settings.js';
 
 let database;
 
@@ -216,9 +217,12 @@ function upsertPlayArtist(artist) {
     .run(artist.artistKey, artist.artistId, artist.artistUri, artist.artistName);
 }
 
+// `days` is a whole number of days or 'all' (from the earliest stored play).
 export function getStats(days) {
-  const since = sinceIso(days);
   const db = getDb();
+  const since = isAllTime(days)
+    ? db.prepare('SELECT MIN(played_at) AS played_at FROM plays').get()?.played_at ?? nowIso()
+    : sinceIso(days);
   const summary = db
     .prepare(`
       SELECT

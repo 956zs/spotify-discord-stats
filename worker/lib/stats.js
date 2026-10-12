@@ -1,11 +1,52 @@
 import { playRowToSongStatus } from '../../shared/song.js';
-import { sinceIso } from '../../shared/time.js';
+import { nowIso, sinceIso } from '../../shared/time.js';
+import { isAllTime } from '../../shared/widget-settings.js';
+import { getState, setState } from './state.js';
 
-export async function getWidgetStats(db, days) {
+const ALL_TIME_STATS_CACHE_KEY = 'widget_stats_cache_all';
+
+// All-time stats read every row, so they are cached and only recomputed when the
+// newest play changes. `refresh` forces a rescan, e.g. after importing older history.
+export async function getWidgetStats(db, days, options = {}) {
   return {
-    ...(await getStats(db, days)),
+    ...(await getRangeStats(db, days, options)),
     lastPlayed: await getLastPlayedSong(db)
   };
+}
+
+async function getRangeStats(db, days, options) {
+  if (!isAllTime(days)) {
+    return getStats(db, days);
+  }
+
+  const latestPlayedAtMs = await getLatestPlayedAtMs(db);
+  if (!options.refresh) {
+    const cached = await readAllTimeCache(db);
+    if (cached?.latestPlayedAtMs === latestPlayedAtMs) {
+      return cached.stats;
+    }
+  }
+
+  const stats = await getStats(db, days);
+  await setState(db, ALL_TIME_STATS_CACHE_KEY, JSON.stringify({ latestPlayedAtMs, stats }));
+  return stats;
+}
+
+async function getLatestPlayedAtMs(db) {
+  const row = await db.prepare('SELECT MAX(played_at_ms) AS played_at_ms FROM plays').first();
+  return row?.played_at_ms ?? null;
+}
+
+async function readAllTimeCache(db) {
+  const raw = await getState(db, ALL_TIME_STATS_CACHE_KEY);
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 export async function getStatsRanges(db, daysList) {
@@ -16,8 +57,10 @@ export async function getStatsRanges(db, daysList) {
   return ranges;
 }
 
+// `days` is a whole number of days or 'all'. All time starts at the earliest play so
+// the windowed queries below stay identical for both cases.
 export async function getStats(db, days) {
-  const since = sinceIso(days);
+  const since = isAllTime(days) ? await getEarliestPlayedAt(db) : sinceIso(days);
   const summary = await getPlaySummary(db, since);
   const artistSummary = await getArtistSummary(db, since);
   const topAlbum = await getTopAlbum(db, since);
@@ -57,6 +100,11 @@ export async function getLastPlayedSong(db) {
     .first();
 
   return playRowToSongStatus(row);
+}
+
+async function getEarliestPlayedAt(db) {
+  const row = await db.prepare('SELECT MIN(played_at) AS played_at FROM plays').first();
+  return row?.played_at ?? nowIso();
 }
 
 async function getPlaySummary(db, since) {
