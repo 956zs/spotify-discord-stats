@@ -1,14 +1,7 @@
 import { appConfig } from './config.js';
-import { getLastPlayedSong, getStats } from './db.js';
+import { getStats } from './db.js';
 import { formatMinutes } from './time.js';
 import { isAllTime } from '../shared/widget-settings.js';
-
-export function getConfiguredStats() {
-  return {
-    ...getStats(appConfig.statsDays),
-    lastPlayed: getLastPlayedSong()
-  };
-}
 
 export function getConfiguredStatsRanges() {
   return getStatsRanges(appConfig.statsRangeDays);

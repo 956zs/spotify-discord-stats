@@ -5,12 +5,11 @@ import { requiredEnv } from './env.js';
 import { sha256 } from './crypto.js';
 import { getState, setState } from './state.js';
 
-export function buildWidgetPayload(stats, settings, now = new Date()) {
-  return buildPayload(stats, settings.widget, widgetConfig.fields, now);
+export function buildWidgetPayload(data, settings) {
+  return buildPayload(data, settings, widgetConfig.fields);
 }
 
-export async function patchDiscordWidget(env, stats, settings, options = {}) {
-  const payload = buildWidgetPayload(stats, settings);
+export async function patchDiscordWidget(env, payload, options = {}) {
   const hash = await sha256(JSON.stringify(payload));
 
   if (await shouldSkipPatch(env.DB, hash, options)) {

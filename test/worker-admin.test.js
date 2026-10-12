@@ -1,45 +1,32 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { handleRequest } from '../worker/app.js';
 import { verifySession } from '../worker/lib/admin-auth.js';
 import { runDueRecapReports } from '../worker/lib/recap-delivery.js';
 import { getDefaultSettings, loadSettings, saveSettings } from '../worker/lib/settings.js';
 import { setState } from '../worker/lib/state.js';
-import { getWidgetStats } from '../worker/lib/stats.js';
+import { getWidgetData } from '../worker/lib/stats.js';
+import { buildWidgetPayload } from '../worker/lib/widget.js';
+import { createD1, insertPlay as insertPlayRow } from './helpers/d1.js';
 
 const ORIGIN = 'https://stats.example.test';
 const ADMIN_TOKEN = 'test-admin-token-123';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Minimal D1 surface (prepare/bind/first/all/run) over an in-memory SQLite database.
-function createD1() {
-  const sqlite = new DatabaseSync(':memory:');
-  const migrationsDir = new URL('../migrations/', import.meta.url);
-  for (const file of fs.readdirSync(migrationsDir).sort()) {
-    sqlite.exec(fs.readFileSync(path.join(migrationsDir.pathname, file), 'utf8'));
-  }
-
-  const statement = (sql, args = []) => ({
-    bind: (...next) => statement(sql, next),
-    first: async () => sqlite.prepare(sql).get(...args) ?? null,
-    all: async () => ({ results: sqlite.prepare(sql).all(...args) }),
-    run: async () => ({ meta: { changes: Number(sqlite.prepare(sql).run(...args).changes) } })
-  });
-  return { prepare: (sql) => statement(sql), sqlite };
+function insertPlay(db, playedAtMs, trackKey, artistKey) {
+  insertPlayRow(db, new Date(playedAtMs).toISOString(), trackKey, artistKey, { album: 'Album' });
 }
 
-function insertPlay(db, playedAtMs, trackKey, artistKey, albumName = 'Album') {
-  const playedAt = new Date(playedAtMs).toISOString();
-  db.sqlite
-    .prepare(`INSERT INTO plays (played_at, played_at_ms, track_key, track_name, album_key, album_name,
-      duration_ms, ms_played, source, created_at) VALUES (?, ?, ?, ?, ?, ?, 60000, 60000, 'test', ?)`)
-    .run(playedAt, playedAtMs, trackKey, `Track ${trackKey}`, albumName, albumName, playedAt);
-  db.sqlite
-    .prepare('INSERT INTO play_artists (played_at, track_key, artist_key, artist_name) VALUES (?, ?, ?, ?)')
-    .run(playedAt, trackKey, artistKey, `Artist ${artistKey}`);
+function settingsWith(statsDays) {
+  const settings = getDefaultSettings();
+  settings.statsDays = statsDays;
+  return settings;
+}
+
+async function slotValue(db, settings, index, options) {
+  const payload = buildWidgetPayload(await getWidgetData(db, settings, options), settings);
+  const name = ['Songs_Played', 'Listening_Time', 'Unique_Songs', 'Different_Artists', 'Different_Albums', 'Top_Album'][index];
+  return payload.data.dynamic.find((field) => field.name === name).value;
 }
 
 function createEnv() {
@@ -71,49 +58,62 @@ async function login(env) {
   return response.headers.get('Set-Cookie').split(';')[0];
 }
 
-test('all-time stats include every play while windowed stats do not', async () => {
+test('all-time data includes every play while windowed data does not', async () => {
   const env = createEnv();
   const now = Date.now();
   insertPlay(env.DB, now - 400 * DAY_MS, 'old', 'a1');
   insertPlay(env.DB, now - DAY_MS, 'new', 'a2');
 
-  const windowed = await getWidgetStats(env.DB, 28);
-  const allTime = await getWidgetStats(env.DB, 'all');
-  assert.equal(windowed.songsPlayed, 1);
-  assert.equal(allTime.songsPlayed, 2);
-  assert.equal(allTime.differentArtists, 2);
-  assert.equal(allTime.since, new Date(now - 400 * DAY_MS).toISOString());
-  assert.equal(allTime.lastPlayed.value.includes('Track new'), true);
+  assert.equal(await slotValue(env.DB, settingsWith(28), 0), '1');
+  assert.equal(await slotValue(env.DB, settingsWith('all'), 0), '2');
+  assert.equal(await slotValue(env.DB, settingsWith('all'), 3), '2');
+  const data = await getWidgetData(env.DB, settingsWith('all'));
+  assert.equal(data.ranges.all.since, new Date(now - 400 * DAY_MS).toISOString());
+  assert.match(data.lastPlayed.value, /Track new/);
 });
 
-test('all-time stats on an empty database return zeros', async () => {
+test('empty database still builds a payload', async () => {
   const env = createEnv();
-  const stats = await getWidgetStats(env.DB, 'all');
-  assert.equal(stats.songsPlayed, 0);
-  assert.equal(stats.topAlbum, 'unknown');
+  assert.equal(await slotValue(env.DB, settingsWith('all'), 0), '0');
+  assert.equal(await slotValue(env.DB, settingsWith(28), 5), 'unknown');
 });
 
-test('all-time cache is reused until a newer play arrives or refresh is forced', async () => {
+test('cached range results are reused until a newer play arrives or refresh is forced', async () => {
   const env = createEnv();
   const now = Date.now();
   insertPlay(env.DB, now - DAY_MS, 'a', 'a1');
-  assert.equal((await getWidgetStats(env.DB, 'all')).songsPlayed, 1);
+  assert.equal(await slotValue(env.DB, settingsWith(28), 0), '1');
 
-  // An imported play older than the newest one does not invalidate the cache...
-  insertPlay(env.DB, now - 900 * DAY_MS, 'imported', 'a1');
-  assert.equal((await getWidgetStats(env.DB, 'all')).songsPlayed, 1);
-  // ...but an explicit refresh does.
-  assert.equal((await getWidgetStats(env.DB, 'all', { refresh: true })).songsPlayed, 2);
+  // A play older than the newest one (like an import) leaves the cache in place...
+  insertPlay(env.DB, now - 2 * DAY_MS, 'imported', 'a1');
+  assert.equal(await slotValue(env.DB, settingsWith(28), 0), '1');
+  // ...until a refresh is forced.
+  assert.equal(await slotValue(env.DB, settingsWith(28), 0, { refresh: true }), '2');
 
   insertPlay(env.DB, now, 'b', 'a2');
-  assert.equal((await getWidgetStats(env.DB, 'all')).songsPlayed, 3);
+  assert.equal(await slotValue(env.DB, settingsWith(28), 0), '3');
 });
 
-test('settings fall back to defaults when nothing or garbage is stored', async () => {
+test('changing the selected metrics recomputes instead of serving a stale cache', async () => {
+  const env = createEnv();
+  insertPlay(env.DB, Date.now() - DAY_MS, 'a', 'a1');
+  const settings = settingsWith(28);
+  await getWidgetData(env.DB, settings);
+
+  settings.widget.slots[0] = { metric: 'topArtist', range: 'global', label: 'Top Artist', value: '{value}' };
+  assert.equal(await slotValue(env.DB, settings, 0), 'Artist a1');
+});
+
+test('settings fall back to defaults when nothing, garbage, or stale metrics are stored', async () => {
   const env = createEnv();
   assert.deepEqual(await loadSettings(env.DB), getDefaultSettings());
 
   await setState(env.DB, 'admin_settings', '{not json');
+  assert.deepEqual(await loadSettings(env.DB), getDefaultSettings());
+
+  const stale = getDefaultSettings();
+  stale.widget.slots[2].metric = 'removedMetric';
+  await setState(env.DB, 'admin_settings', JSON.stringify(stale));
   assert.deepEqual(await loadSettings(env.DB), getDefaultSettings());
 });
 
@@ -121,12 +121,12 @@ test('saved settings round-trip and invalid input is rejected', async () => {
   const env = createEnv();
   const input = getDefaultSettings();
   input.statsDays = 'all';
-  input.widget.stats.songsPlayed.label = 'All Songs';
+  input.widget.slots[0] = { metric: 'newArtists', range: 90, label: 'New Artists', value: '{value}' };
   await saveSettings(env.DB, input);
 
   const loaded = await loadSettings(env.DB);
   assert.equal(loaded.statsDays, 'all');
-  assert.equal(loaded.widget.stats.songsPlayed.label, 'All Songs');
+  assert.deepEqual(loaded.widget.slots[0], { metric: 'newArtists', range: 90, label: 'New Artists', value: '{value}' });
 
   await assert.rejects(saveSettings(env.DB, { ...input, statsDays: 0 }), { status: 400 });
 });
@@ -222,7 +222,8 @@ test('session cookie is hardened and unlocks the admin api', async () => {
   const data = await state.json();
   assert.equal(state.status, 200);
   assert.equal(data.settings.statsDays, getDefaultSettings().statsDays);
-  assert.equal(data.fields.labels.songsPlayed, 'Songs_Played_Label');
+  assert.equal(data.fields.slots[0].label, 'Songs_Played_Label');
+  assert.ok(data.metrics.some((metric) => metric.id === 'topArtist'));
   assert.ok(data.payload.data.dynamic.some((field) => field.name === 'Songs_Played_Label'));
 });
 

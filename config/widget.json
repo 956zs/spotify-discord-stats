@@ -3,33 +3,75 @@
   "topHeroTitle": "✦ {range} on Spotify🧋",
   "lastUpdatedPrefix": "last updated: ",
   "mainTitle": "✦ {range} plays: {count}",
-  "stats": {
-    "songsPlayed": { "label": "Total Songs Played", "value": "{value}" },
-    "listeningTime": { "label": "Total Listening Time", "value": "{value}" },
-    "uniqueSongs": { "label": "Unique Songs", "value": "{value}" },
-    "differentArtists": { "label": "Different Artists", "value": "{value}" },
-    "differentAlbums": { "label": "Different Albums", "value": "{value}" },
-    "topAlbum": { "label": "Top Album", "value": "{value}" }
-  },
+  "slots": [
+    {
+      "metric": "songsPlayed",
+      "range": "global",
+      "label": "Total Songs Played",
+      "value": "{value}"
+    },
+    {
+      "metric": "listeningMinutes",
+      "range": "global",
+      "label": "Total Listening Time",
+      "value": "{value}"
+    },
+    {
+      "metric": "uniqueSongs",
+      "range": "global",
+      "label": "Unique Songs",
+      "value": "{value}"
+    },
+    {
+      "metric": "differentArtists",
+      "range": "global",
+      "label": "Different Artists",
+      "value": "{value}"
+    },
+    {
+      "metric": "differentAlbums",
+      "range": "global",
+      "label": "Different Albums",
+      "value": "{value}"
+    },
+    {
+      "metric": "topAlbum",
+      "range": "global",
+      "label": "Top Album",
+      "value": "{value}"
+    }
+  ],
   "fields": {
     "topHeroTitle": "top_hero_title",
     "during": "during",
     "lastUpdated": "last_updated",
     "song": "song",
     "mainTitle": "main_title",
-    "songsPlayed": "Songs_Played",
-    "listeningTime": "Listening_Time",
-    "uniqueSongs": "Unique_Songs",
-    "differentArtists": "Different_Artists",
-    "differentAlbums": "Different_Albums",
-    "topAlbum": "Top_Album",
-    "labels": {
-      "songsPlayed": "Songs_Played_Label",
-      "listeningTime": "Listening_Time_Label",
-      "uniqueSongs": "Unique_Songs_Label",
-      "differentArtists": "Different_Artists_Label",
-      "differentAlbums": "Different_Albums_Label",
-      "topAlbum": "Top_Album_Label"
-    }
+    "slots": [
+      {
+        "value": "Songs_Played",
+        "label": "Songs_Played_Label"
+      },
+      {
+        "value": "Listening_Time",
+        "label": "Listening_Time_Label"
+      },
+      {
+        "value": "Unique_Songs",
+        "label": "Unique_Songs_Label"
+      },
+      {
+        "value": "Different_Artists",
+        "label": "Different_Artists_Label"
+      },
+      {
+        "value": "Different_Albums",
+        "label": "Different_Albums_Label"
+      },
+      {
+        "value": "Top_Album",
+        "label": "Top_Album_Label"
+      }
+    ]
   }
 }

@@ -1,5 +1,6 @@
 import { appConfig, widgetConfig } from './config.js';
 import { MS_PER_DAY } from '../shared/time.js';
+import { metricCatalog } from '../shared/widget-metrics.js';
 import {
   checkAdminToken,
   clearSessionCookie,
@@ -18,7 +19,7 @@ import { getDefaultSettings, loadSettings, parseSettingsInput, saveSettings } fr
 import { getSpotifyRefreshTokenIssuedAt } from './lib/spotify.js';
 import { getState } from './lib/state.js';
 import { syncOnce } from './lib/sync.js';
-import { getStatsRanges, getWidgetStats } from './lib/stats.js';
+import { getStats, getStatsRanges, getWidgetData } from './lib/stats.js';
 import { buildWidgetPayload } from './lib/widget.js';
 
 export async function handleRequest(request, env) {
@@ -63,7 +64,7 @@ export async function handleRequest(request, env) {
   if (url.pathname === '/admin/stats') {
     await requireAdmin(request, url, env);
     const settings = await loadSettings(env.DB);
-    const stats = await getWidgetStats(env.DB, settings.statsDays);
+    const stats = await getStats(env.DB, settings.statsDays);
     const statsRanges = await getStatsRanges(env.DB, appConfig.statsRangeDays);
     return json({ ...stats, statsRanges });
   }
@@ -112,12 +113,13 @@ async function handleLogin(request, url, env) {
 async function handleAdminApi(request, url, env) {
   if (url.pathname === '/admin/api/state' && request.method === 'GET') {
     const settings = await loadSettings(env.DB);
-    const stats = await getWidgetStats(env.DB, settings.statsDays);
+    const data = await getWidgetData(env.DB, settings);
     return json({
       settings,
       defaults: getDefaultSettings(),
-      payload: buildWidgetPayload(stats, settings),
+      payload: buildWidgetPayload(data, settings),
       fields: widgetConfig.fields,
+      metrics: metricCatalog(),
       status: await adminStatus(env)
     });
   }
@@ -128,8 +130,8 @@ async function handleAdminApi(request, url, env) {
 
   if (url.pathname === '/admin/api/preview') {
     const settings = parseSettingsInput(body.settings);
-    const stats = await getWidgetStats(env.DB, settings.statsDays);
-    return json({ payload: buildWidgetPayload(stats, settings), fields: widgetConfig.fields });
+    const data = await getWidgetData(env.DB, settings);
+    return json({ payload: buildWidgetPayload(data, settings), fields: widgetConfig.fields });
   }
 
   if (url.pathname === '/admin/api/settings') {

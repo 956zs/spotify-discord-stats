@@ -2,17 +2,24 @@ import crypto from 'node:crypto';
 import { appConfig, widgetConfig } from './config.js';
 import { env, requiredEnv } from './env.js';
 import { getState, setState } from './db.js';
-import { buildWidgetPayload as buildPayload } from '../shared/widget-payload.js';
+import { getD1Compat, getLastPlayedSong } from './db.js';
+import { buildWidgetPayload as buildPayload, collectWidgetData } from '../shared/widget-payload.js';
 import { defaultSettings } from '../shared/widget-settings.js';
 
 // The Node runtime has no admin page, so its settings are the config file defaults.
-export function buildWidgetPayload(stats, now = new Date()) {
-  const settings = defaultSettings(appConfig, widgetConfig);
-  return buildPayload(stats, settings.widget, widgetConfig.fields, now);
+export function getWidgetSettings() {
+  return defaultSettings(appConfig, widgetConfig);
 }
 
-export async function patchDiscordWidget(stats, options = {}) {
-  const payload = buildWidgetPayload(stats);
+export async function getWidgetPayload(settings = getWidgetSettings(), now = new Date()) {
+  const data = await collectWidgetData(getD1Compat(), settings, {
+    now,
+    lastPlayed: getLastPlayedSong()
+  });
+  return buildPayload(data, settings, widgetConfig.fields, now);
+}
+
+export async function patchDiscordWidget(payload, options = {}) {
   const hash = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 
   if (appConfig.patchOnlyWhenChanged && !options.force) {

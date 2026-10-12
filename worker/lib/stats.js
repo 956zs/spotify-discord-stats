@@ -1,44 +1,49 @@
 import { playRowToSongStatus } from '../../shared/song.js';
 import { nowIso, sinceIso } from '../../shared/time.js';
+import { collectWidgetData } from '../../shared/widget-payload.js';
+import {
+  getLatestPlayedAtMs,
+  rangeKey,
+  resolveSince,
+  runMetricQueries
+} from '../../shared/widget-metrics-query.js';
 import { isAllTime } from '../../shared/widget-settings.js';
 import { getState, setState } from './state.js';
 
-const ALL_TIME_STATS_CACHE_KEY = 'widget_stats_cache_all';
+const CACHE_KEY_PREFIX = 'widget_metrics_cache:';
 
-// All-time stats read every row, so they are cached and only recomputed when the
-// newest play changes. `refresh` forces a rescan, e.g. after importing older history.
-export async function getWidgetStats(db, days, options = {}) {
-  return {
-    ...(await getRangeStats(db, days, options)),
-    lastPlayed: await getLastPlayedSong(db)
-  };
-}
-
-async function getRangeStats(db, days, options) {
-  if (!isAllTime(days)) {
-    return getStats(db, days);
-  }
-
+// Widget numbers for the current settings. Each range's results are cached and reused
+// while the newest play, the hour-floored window start, and the query set are all
+// unchanged, so idle cron ticks skip the window scans entirely. `refresh` forces a
+// recompute, e.g. after importing older history (which leaves the newest play as is).
+export async function getWidgetData(db, settings, options = {}) {
+  const now = options.now ?? new Date();
   const latestPlayedAtMs = await getLatestPlayedAtMs(db);
-  if (!options.refresh) {
-    const cached = await readAllTimeCache(db);
-    if (cached?.latestPlayedAtMs === latestPlayedAtMs) {
-      return cached.stats;
+
+  return collectWidgetData(db, settings, {
+    now,
+    lastPlayed: await getLastPlayedSong(db),
+    loadRange: async (days, queryIds) => {
+      const since = await resolveSince(db, days, now);
+      const fingerprint = `${latestPlayedAtMs}|${since}|${queryIds.join(',')}`;
+      const cacheKey = `${CACHE_KEY_PREFIX}${rangeKey(days)}`;
+
+      if (!options.refresh) {
+        const cached = await readCache(db, cacheKey);
+        if (cached?.fingerprint === fingerprint) {
+          return { since, results: cached.results };
+        }
+      }
+
+      const results = await runMetricQueries(db, since, queryIds);
+      await setState(db, cacheKey, JSON.stringify({ fingerprint, results }));
+      return { since, results };
     }
-  }
-
-  const stats = await getStats(db, days);
-  await setState(db, ALL_TIME_STATS_CACHE_KEY, JSON.stringify({ latestPlayedAtMs, stats }));
-  return stats;
+  });
 }
 
-async function getLatestPlayedAtMs(db) {
-  const row = await db.prepare('SELECT MAX(played_at_ms) AS played_at_ms FROM plays').first();
-  return row?.played_at_ms ?? null;
-}
-
-async function readAllTimeCache(db) {
-  const raw = await getState(db, ALL_TIME_STATS_CACHE_KEY);
+async function readCache(db, key) {
+  const raw = await getState(db, key);
   if (!raw) {
     return null;
   }
@@ -57,8 +62,8 @@ export async function getStatsRanges(db, daysList) {
   return ranges;
 }
 
-// `days` is a whole number of days or 'all'. All time starts at the earliest play so
-// the windowed queries below stay identical for both cases.
+// Plain summary for /admin/stats and sync debugging output. `days` is a whole number of
+// days or 'all' (from the earliest stored play).
 export async function getStats(db, days) {
   const since = isAllTime(days) ? await getEarliestPlayedAt(db) : sinceIso(days);
   const summary = await getPlaySummary(db, since);

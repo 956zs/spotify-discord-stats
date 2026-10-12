@@ -217,6 +217,16 @@ function upsertPlayArtist(artist) {
     .run(artist.artistKey, artist.artistId, artist.artistUri, artist.artistName);
 }
 
+// D1-shaped wrapper (prepare/bind/first/all) so shared async query code runs here too.
+export function getD1Compat() {
+  const statement = (sql, args = []) => ({
+    bind: (...next) => statement(sql, next),
+    first: async () => getDb().prepare(sql).get(...args) ?? null,
+    all: async () => ({ results: getDb().prepare(sql).all(...args) })
+  });
+  return { prepare: (sql) => statement(sql) };
+}
+
 // `days` is a whole number of days or 'all' (from the earliest stored play).
 export function getStats(days) {
   const db = getDb();

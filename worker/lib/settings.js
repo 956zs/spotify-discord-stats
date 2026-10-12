@@ -17,7 +17,14 @@ export async function loadSettings(db) {
   }
 
   try {
-    return mergeSettings(getDefaultSettings(), JSON.parse(raw));
+    // Re-validate so a stored metric id that a later version dropped cannot break sync.
+    const merged = mergeSettings(getDefaultSettings(), JSON.parse(raw));
+    const { settings, errors } = validateSettings(merged, widgetConfig.fields.slots.length);
+    if (!settings) {
+      console.warn('stored settings are invalid, using defaults', errors.join('; '));
+      return getDefaultSettings();
+    }
+    return settings;
   } catch (error) {
     console.warn('stored settings are unreadable, using defaults', error.message);
     return getDefaultSettings();
@@ -25,7 +32,7 @@ export async function loadSettings(db) {
 }
 
 export function parseSettingsInput(input) {
-  const { settings, errors } = validateSettings(input);
+  const { settings, errors } = validateSettings(input, widgetConfig.fields.slots.length);
   if (!settings) {
     throw new HttpError(`invalid settings: ${errors.join('; ')}`, 400);
   }

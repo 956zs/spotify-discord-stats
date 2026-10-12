@@ -1,16 +1,11 @@
+import { isMetricId } from './widget-metrics.js';
+
 // Editable settings live in two layers: config/*.json supplies defaults at build time,
 // and the admin page stores overrides at runtime. Everything here is runtime-neutral so
 // the Worker, the Node runtime, and tests share one definition of "valid settings".
 
 export const ALL_TIME = 'all';
-export const STAT_KEYS = [
-  'songsPlayed',
-  'listeningTime',
-  'uniqueSongs',
-  'differentArtists',
-  'differentAlbums',
-  'topAlbum'
-];
+export const GLOBAL_RANGE = 'global';
 
 const MAX_STATS_DAYS = 3650;
 const MAX_TEXT_LENGTH = 256;
@@ -19,14 +14,6 @@ const DAYS_PER_WEEK = 7;
 const DAYS_PER_YEAR = 365;
 
 export function defaultSettings(appConfig, widgetConfig) {
-  const stats = {};
-  for (const key of STAT_KEYS) {
-    stats[key] = {
-      label: widgetConfig.stats?.[key]?.label ?? '',
-      value: widgetConfig.stats?.[key]?.value ?? '{value}'
-    };
-  }
-
   return {
     statsDays: appConfig.statsDays,
     recapEnabled: appConfig.recapReports?.enabled !== false,
@@ -35,13 +22,22 @@ export function defaultSettings(appConfig, widgetConfig) {
       topHeroTitle: widgetConfig.topHeroTitle,
       mainTitle: widgetConfig.mainTitle,
       lastUpdatedPrefix: widgetConfig.lastUpdatedPrefix,
-      stats
+      slots: widgetConfig.slots.map((slot) => ({
+        metric: slot.metric,
+        range: slot.range ?? GLOBAL_RANGE,
+        label: slot.label ?? '',
+        value: slot.value ?? '{value}'
+      }))
     }
   };
 }
 
 // Stored overrides may predate newly added keys, so missing values fall back to defaults.
+// Arrays (the slot list) are replaced whole, and only when the length still matches.
 export function mergeSettings(defaults, overrides) {
+  if (Array.isArray(defaults)) {
+    return Array.isArray(overrides) && overrides.length === defaults.length ? overrides : defaults;
+  }
   if (!isPlainObject(overrides)) {
     return defaults;
   }
@@ -51,32 +47,24 @@ export function mergeSettings(defaults, overrides) {
     if (!(key in defaults)) {
       continue;
     }
-    merged[key] = isPlainObject(defaults[key]) ? mergeSettings(defaults[key], value) : value;
+    const nested = isPlainObject(defaults[key]) || Array.isArray(defaults[key]);
+    merged[key] = nested ? mergeSettings(defaults[key], value) : value;
   }
   return merged;
 }
 
 // Builds a clean settings object from untrusted input: unknown keys are dropped and
-// every kept value is type- and length-checked.
-export function validateSettings(input) {
+// every kept value is type- and length-checked. `slotCount` is the number of stat
+// slots wired up in the Discord widget editor.
+export function validateSettings(input, slotCount) {
   const errors = [];
   if (!isPlainObject(input)) {
     return { settings: null, errors: ['settings must be an object'] };
   }
 
   const widgetInput = isPlainObject(input.widget) ? input.widget : {};
-  const statsInput = isPlainObject(widgetInput.stats) ? widgetInput.stats : {};
-  const stats = {};
-  for (const key of STAT_KEYS) {
-    const stat = isPlainObject(statsInput[key]) ? statsInput[key] : {};
-    stats[key] = {
-      label: text(stat.label, `widget.stats.${key}.label`, errors, { required: true }),
-      value: text(stat.value, `widget.stats.${key}.value`, errors, { required: true })
-    };
-  }
-
   const settings = {
-    statsDays: statsDays(input.statsDays, errors),
+    statsDays: statsDays(input.statsDays, 'statsDays', errors),
     recapEnabled: boolean(input.recapEnabled, 'recapEnabled', errors),
     widget: {
       username: text(widgetInput.username, 'widget.username', errors, {
@@ -86,11 +74,16 @@ export function validateSettings(input) {
       topHeroTitle: text(widgetInput.topHeroTitle, 'widget.topHeroTitle', errors),
       mainTitle: text(widgetInput.mainTitle, 'widget.mainTitle', errors),
       lastUpdatedPrefix: text(widgetInput.lastUpdatedPrefix, 'widget.lastUpdatedPrefix', errors),
-      stats
+      slots: slots(widgetInput.slots, slotCount, errors)
     }
   };
 
   return errors.length ? { settings: null, errors } : { settings, errors };
+}
+
+// A slot's own range, or the global one when it follows it.
+export function resolveSlotRange(slotRange, globalDays) {
+  return slotRange === GLOBAL_RANGE ? globalDays : slotRange;
 }
 
 export function isAllTime(days) {
@@ -136,16 +129,37 @@ function plural(count, unit) {
   return `${count} ${unit}${count === 1 ? '' : 's'}`;
 }
 
-function statsDays(value, errors) {
+function statsDays(value, name, errors) {
   if (isAllTime(value)) {
     return ALL_TIME;
   }
   const days = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
   if (!Number.isInteger(days) || days < 1 || days > MAX_STATS_DAYS) {
-    errors.push(`statsDays must be "${ALL_TIME}" or a whole number from 1 to ${MAX_STATS_DAYS}`);
+    errors.push(`${name} must be "${ALL_TIME}" or a whole number from 1 to ${MAX_STATS_DAYS}`);
     return null;
   }
   return days;
+}
+
+function slots(value, slotCount, errors) {
+  if (!Array.isArray(value) || value.length !== slotCount) {
+    errors.push(`widget.slots must list exactly ${slotCount} slots`);
+    return null;
+  }
+
+  return value.map((slot, index) => {
+    const name = `widget.slots[${index}]`;
+    const input = isPlainObject(slot) ? slot : {};
+    if (!isMetricId(input.metric)) {
+      errors.push(`${name}.metric is not a known metric`);
+    }
+    return {
+      metric: input.metric,
+      range: input.range === GLOBAL_RANGE ? GLOBAL_RANGE : statsDays(input.range, `${name}.range`, errors),
+      label: text(input.label, `${name}.label`, errors, { required: true }),
+      value: text(input.value, `${name}.value`, errors, { required: true })
+    };
+  });
 }
 
 function boolean(value, name, errors) {
