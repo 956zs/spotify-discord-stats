@@ -321,6 +321,8 @@ Spotify 可以把你所有的播放紀錄寄給你：
 
 - **不是 Premium。** 從 2026 年 2 月起，免費的 Spotify 帳號不能建立開發者 app。
   這時頁面只會寫「You haven't created any apps yet」，完全沒有按鈕。
+- **你是 Premium Duo 或家庭方案的成員。** 有使用者回報，這裡只有付款的方案管理者帳號算 Premium，
+  成員帳號會看到一樣空白的頁面。請方案管理者來建立 app（見下面的變通方法）。
 - **email 還沒驗證。** 頁面上會寫「You need to verify your email address before you can create an app」。
   請先驗證 Spotify 帳號的 email。如果你是用 Google、Facebook 或 Apple 登入，可能收不到驗證信，
   要先到[登入方式](https://www.spotify.com/account/login-methods/)加一個「email 和密碼」的登入方式。

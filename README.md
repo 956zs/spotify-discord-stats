@@ -373,6 +373,9 @@ it has less detail. To undo an import, see
 - **No Premium.** Since February 2026, free Spotify accounts can't create
   developer apps. The dashboard then only says "You haven't created any apps
   yet", with no button at all.
+- **Premium Duo or Family member.** Users report that only the plan manager's
+  account counts as Premium here; member accounts get the same empty
+  dashboard. Ask the plan manager to create the app (see the workaround below).
 - **Email not verified.** The dashboard says "You need to verify your email
   address before you can create an app". Verify the email on your Spotify
   account. If you sign in with Google, Facebook, or Apple, you may not get the
