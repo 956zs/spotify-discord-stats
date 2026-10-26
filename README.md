@@ -2,31 +2,38 @@
 
 English | [繁體中文](README.zh-TW.md)
 
-Keep your own Spotify listening history and get a weekly and monthly recap in
-your Discord DMs. It runs for free on Cloudflare, with no server of your own.
+Show your Spotify listening stats on your Discord profile. A small Cloudflare
+Worker checks what you played every 10 minutes and updates a profile widget
+with your last played song and six stats of your choice. It also sends you a
+weekly and a monthly recap by Discord DM. It runs for free on Cloudflare, with
+no server of your own.
 
-- Saves every song you play on Spotify, checked every 10 minutes.
-- Sends a weekly recap every Monday and a monthly recap on the 1st, as a
-  Discord DM with your top songs, artists, albums, listening time, and habits.
-- Has a small web page (`/admin`) where you pick which stats to show and send
-  test recaps.
-- Can import your full Spotify history export, so stats go back years.
-- Can update a Discord profile widget with your stats, if your Discord app
-  still has one (see the note below).
+<img src="docs/images/widget.png" alt="Profile widget showing four weeks of Spotify stats" width="480">
 
-![Admin page with sample data](docs/images/admin.png)
+- **Profile widget:** last played song, plus six stats such as songs played,
+  listening time, different artists, or top album, over 4 weeks or any range.
+- **Admin page** (`/admin`): choose the six stats, their time ranges, and the
+  widget text, then sync or send a test recap. No redeploy needed.
+- **Recap DMs:** every Monday and on the 1st of each month, with your top
+  songs, artists, albums, and listening habits.
+- **History import:** load your full Spotify history export, so stats go back
+  years.
 
-> [!IMPORTANT]
-> **About the Discord profile widget.** Discord ended its custom profile widget
-> experiment on 2026-07-27, so new widgets can no longer be created. If you
-> already have one, it keeps working for now: see
-> [docs/discord-widget.md](docs/discord-widget.md). Everything else in this
-> project works without a widget.
+> [!WARNING]
+> **Can I still make a profile widget?** Discord ended its custom profile
+> widget experiment on 2026-07-27. Widgets made during the experiment still
+> update (this project's own widget does), but Discord now only gives the
+> widget editor to apps with a
+> [claimed game](https://docs.discord.com/developers/social-layer/game-stats-widgets/overview).
+> You will see in [Step 7](#step-7-set-up-the-profile-widget) whether your app
+> has it. Without a widget, everything else still works: stats, the admin page,
+> and recap DMs.
 
 ## Contents
 
 - [What you need](#what-you-need)
 - [Setup, step by step](#setup-step-by-step)
+- [Choosing what the widget shows](#choosing-what-the-widget-shows)
 - [What happens next](#what-happens-next)
 - [Import your full Spotify history](#import-your-full-spotify-history-optional)
 - [Troubleshooting](#troubleshooting)
@@ -43,9 +50,18 @@ your Discord DMs. It runs for free on Cloudflare, with no server of your own.
 - **A free [Cloudflare](https://dash.cloudflare.com/sign-up) account.** This is
   where the project runs.
 - **[Node.js](https://nodejs.org/) 24 or newer** on your computer, used only to
-  set things up.
-- About 30 minutes, and a terminal (Command Prompt, PowerShell, or Terminal)
-  you can paste commands into.
+  set things up. After installing it, open a new terminal and run `node -v` to
+  check that it prints `v24` or higher.
+- About 30 minutes.
+
+You will paste commands into a terminal in the project folder:
+
+- **Windows:** open the folder in File Explorer, click the address bar, type
+  `cmd`, and press Enter. Use this Command Prompt rather than PowerShell, which
+  often blocks `npm` with a "running scripts is disabled" error.
+- **macOS:** right-click the folder in Finder and choose **Services** →
+  **New Terminal at Folder**.
+- **Linux:** open a terminal and `cd` into the folder.
 
 Along the way you will collect a few values. Keep a text file open and paste
 them there as you go:
@@ -72,28 +88,29 @@ it. Or, if you use git:
 git clone https://github.com/956zs/spotify-discord-stats.git
 ```
 
-Open a terminal in the project folder and install what it needs:
+Open a terminal in the project folder (see [What you need](#what-you-need))
+and install what it needs:
 
 ```bash
 npm install
 ```
 
-### Step 2: Create a Discord bot
+### Step 2: Create a Discord app and bot
 
-The bot is what sends you the recap DMs.
+The profile widget belongs to this app, and its bot sends you the recap DMs.
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
-   and click **New Application**. Give it any name, for example
+   and click **New Application**. Its name is shown on the widget, for example
    `My Spotify Stats`.
 2. On the **General Information** page, copy the **Application ID**.
 3. Open the **Bot** page, click **Reset Token**, and copy the token. Discord
    shows it only once. Treat it like a password.
 4. Add the bot to your server: open **OAuth2** → **URL Generator** and tick
-   the `bot` scope. Open the generated link at the bottom, pick your server,
-   and confirm.
+   the `bot` scope. No permissions are needed. Open the generated link at the
+   bottom, pick your server, then click **Continue** and **Authorize**.
 5. Get your own user ID: in Discord, open **User Settings** (the gear icon) →
-   **Advanced** and turn on **Developer Mode**. Then right-click your name anywhere and choose
-   **Copy User ID**.
+   **Advanced** and turn on **Developer Mode**. Then right-click your name
+   anywhere and choose **Copy User ID**.
 
 > [!NOTE]
 > The bot can only DM you if you share a server with it and that server allows
@@ -121,12 +138,13 @@ The bot is what sends you the recap DMs.
    npm run cf:d1:create
    ```
 
-   It prints a `database_id` (a long ID like `1a2b3c4d-...`). Copy it. If
-   Wrangler asks whether to add the database to your config for you, answer
-   **No**.
-4. Open `wrangler.toml` in a text editor and paste the ID into
-   `database_id = "paste-database-id-here"`. Save.
-5. Set up the database tables, then put the project online for the first time:
+   It prints a `database_id`, a long ID like `1a2b3c4d-...`. Copy it.
+4. Open `wrangler.toml` in a plain text editor (Notepad on Windows; on macOS
+   use a code editor such as VS Code, because TextEdit changes `"` into curly
+   quotes). Paste the ID into `database_id = "paste-database-id-here"` and
+   save.
+5. Set up the database tables, then put the project online for the first time.
+   If a command asks you to confirm, type `y` and press Enter.
 
    ```bash
    npm run cf:d1:migrate:remote
@@ -134,7 +152,8 @@ The bot is what sends you the recap DMs.
    ```
 
    If this is your first Worker, Wrangler asks you to pick a `workers.dev`
-   subdomain. Any free name works.
+   subdomain. Any available name works. A brand-new address can take a few
+   minutes to start working.
 6. The deploy prints your **Worker URL**, something like
    `https://spotify-discord-stats.your-name.workers.dev`. Copy it.
 
@@ -154,8 +173,8 @@ The bot is what sends you the recap DMs.
    **View client secret** and copy the **Client Secret**.
 
 > [!NOTE]
-> Sign in to Spotify in Step 6 with the same account that owns this app. To use
-> a different Spotify account, add it under **Settings** → **Users Management**
+> Connect Spotify in Step 6 with the same account that owns this app. To use a
+> different Spotify account, add it under **Settings** → **Users Management**
 > first.
 
 ### Step 5: Fill in your settings
@@ -168,14 +187,16 @@ The bot is what sends you the recap DMs.
    DISCORD_CLIENT_ID = "your Discord Application ID"
    DISCORD_USER_ID = "your Discord user ID"
    SPOTIFY_CLIENT_ID = "your Spotify Client ID"
-   SPOTIFY_REDIRECT_URI = "your Worker URL/spotify/callback"
-   PUBLIC_BASE_URL = "your Worker URL"
+   SPOTIFY_REDIRECT_URI = "https://spotify-discord-stats.your-name.workers.dev/spotify/callback"
+   PUBLIC_BASE_URL = "https://spotify-discord-stats.your-name.workers.dev"
    ```
 
 2. Make up an admin password: a long random string of at least 32 characters
-   (a password manager can generate one). You use it to open the admin page.
-3. Save the three secret values in Cloudflare. Run each command, then paste the
-   value when it asks:
+   (a password manager can generate one). You use it to sign in to the admin
+   page.
+3. Save the three secret values in Cloudflare. Run each command, then paste
+   the value when it asks and press Enter. Nothing appears while you paste;
+   that is normal.
 
    ```bash
    npx wrangler secret put DISCORD_TOKEN
@@ -183,8 +204,9 @@ The bot is what sends you the recap DMs.
    npx wrangler secret put ADMIN_TOKEN
    ```
 
-   Cloudflare never shows these values again, so keep your admin password
-   somewhere safe.
+   `DISCORD_TOKEN` is the bot token, `SPOTIFY_CLIENT_SECRET` the Spotify
+   Client Secret, and `ADMIN_TOKEN` your admin password. Cloudflare never shows
+   them again, so keep your admin password somewhere safe.
 4. Deploy again so the new settings take effect:
 
    ```bash
@@ -193,38 +215,84 @@ The bot is what sends you the recap DMs.
 
 ### Step 6: Connect your Spotify account
 
-Open this address in your browser, with your own Worker URL and admin password:
+1. Open your Worker URL followed by `/admin`, for example
+   `https://spotify-discord-stats.your-name.workers.dev/admin`.
+2. Paste your admin password into the **ADMIN_TOKEN** box and click **登入**
+   (Sign in). The admin page is in Chinese; the buttons you need are named
+   below.
+3. Click **Spotify 重新授權** (Connect Spotify). Spotify asks for permission to
+   read your recently played songs. Click **Agree**. You should see
+   **Spotify authorization complete**.
 
-```text
-https://YOUR_WORKER_URL/spotify/login?token=YOUR_ADMIN_PASSWORD
-```
+### Step 7: Set up the profile widget
 
-Spotify asks for permission to read your recently played songs. Click
-**Agree**. You should see **Spotify authorization complete**.
+1. In the [Discord Developer Portal](https://discord.com/developers/applications),
+   open your app. In the left menu under **Games**, click **Widget**.
 
-### Step 7: Check that it works
+   > If there is no **Widget** item, Discord has not given your app the widget
+   > editor (see the warning at the top). Skip to Step 8; everything except the
+   > widget works.
 
-1. Open `https://YOUR_WORKER_URL/admin` and sign in with your admin password.
-2. Click **立即同步** (Sync now). The preview fills with your recent songs.
-3. Click **發送週報** (Send weekly recap). A recap DM from your bot should
-   arrive in Discord within a few seconds.
+2. Open [docs/discord-widget-config.json](docs/discord-widget-config.json) and
+   copy all of it (on GitHub, use the **Copy raw file** button). In the widget
+   editor, click the **⋮** button at the top right and choose
+   **Paste config from clipboard**. This sets up every field with the right
+   name.
+3. The widget shows three pictures. Upload your own images under **Games** →
+   **Assets** with the names `widget_hero` (the big picture on the widget),
+   `widget_preview`, and `widget_mini`, or pick other images in the editor.
+4. Click **Save changes**. You don't need to publish: as the app's owner you
+   can add an unpublished widget to your own profile.
+5. In Discord, open your full profile and click **Add Widget**. Under
+   **Game Widgets**, find your app and click **Add to profile**.
+
+<img src="docs/images/widget-editor.png" alt="Widget editor after pasting the config" width="720">
+
+Field names and details: [docs/discord-widget.md](docs/discord-widget.md).
+
+### Step 8: Check that it works
+
+1. On the admin page, click **立即同步** (Sync now). The line under the buttons
+   shows **抓到 N 筆、新增 N 筆** (fetched N, added N) and whether the widget
+   was updated. Reload the page to refresh the preview.
+2. Your profile widget now shows your stats. If it does not change, reload
+   Discord (`Ctrl+R`, or `Cmd+R` on macOS).
+3. Click **發送週報** (Send weekly recap) and confirm. A recap DM from your bot
+   arrives within a few seconds.
 
 Done. You can close the terminal; everything now runs on Cloudflare.
 
+## Choosing what the widget shows
+
+The admin page sets the stats range (7, 28, 90, 365 days, any number of days,
+or all time), the widget text, and what each of the six stat slots shows, with
+a live preview. Changes apply at the next sync, or right away with
+**儲存並推送到 Discord** (Save and push to Discord).
+
+![Admin page with sample data](docs/images/admin.png)
+
+Every setting and stat is listed in [docs/admin-page.md](docs/admin-page.md).
+
 ## What happens next
 
-- Every 10 minutes, the Worker reads your last 50 played songs from Spotify and
-  saves new ones. Spotify only keeps a short recent history, so songs from
-  before you set this up are missing until you
+- Every 10 minutes, the Worker reads your last 50 played songs from Spotify,
+  saves new ones, and updates the widget when the numbers change. Spotify only
+  keeps a short recent history, so songs from before you set this up are
+  missing until you
   [import your history](#import-your-full-spotify-history-optional).
 - **Weekly recap:** every Monday at 09:00, covering the last 7 days.
 - **Monthly recap:** on the 1st of each month at 09:00, covering the previous
   month.
 - Recap times use Taiwan time (UTC+8). The time zone is not configurable yet.
-- When the Spotify connection needs renewing, the bot reminds you by DM. Repeat
-  [Step 6](#step-6-connect-your-spotify-account) when it does.
+- Spotify connections are assumed to last about 180 days. From 30 days before
+  that, the bot DMs you a reminder once a day with a link to reconnect. If
+  syncing starts failing earlier, reconnect with **Spotify 重新授權** on the
+  admin page.
 
-Recaps can be turned off on the admin page.
+<img src="docs/images/recap.png" alt="Weekly recap DM" width="480">
+
+Recaps can be turned off on the admin page: untick **自動發送週報 / 月報 DM**
+(send recap DMs), then click **只儲存** (Save only).
 
 ## Import your full Spotify history (optional)
 
@@ -235,19 +303,21 @@ Spotify can send you everything you have ever played:
    usually within a few days and at most 30.
 2. Unzip the download.
 3. Back up the database, check the import without writing anything, then
-   import:
+   import. Put the folder path in quotes; you can drag the folder into the
+   terminal window to paste its path.
 
    ```bash
    npm run cf:d1:backup:remote
-   npm run cf:import -- --remote --dry-run /path/to/the/unzipped/folder
-   npm run cf:import -- --remote /path/to/the/unzipped/folder
+   npm run cf:import -- --remote --dry-run "/path/to/Spotify Extended Streaming History"
+   npm run cf:import -- --remote "/path/to/Spotify Extended Streaming History"
    ```
 
 4. On the admin page, click **立即同步** (Sync now) to refresh the numbers.
 
-Running the same import twice does not count songs twice. The shorter
-"Account data" export also works, but it has less detail. For overlap handling,
-cutoffs, and how to undo an import, see
+The import skips everything played after your first synced song, so plays
+already saved by the Worker are not counted twice, and running the same import
+again does not add anything. The shorter "Account data" export also works, but
+it has less detail. To undo an import, see
 [docs/backup-rollback-and-import.md](docs/backup-rollback-and-import.md).
 
 ## Troubleshooting
@@ -262,11 +332,22 @@ slash. Fix whichever one is wrong, then run `npm run cf:deploy` if you changed
 </details>
 
 <details>
-<summary><b>Sync fails with <code>Active premium subscription required</code> or a 403 error</b></summary>
+<summary><b>Sync fails with <code>Active premium subscription required</code> or a 403 error from Spotify</b></summary>
 
 The Spotify account that owns the app needs an active Premium subscription. If
-you connected a different Spotify account, add it under **Users Management** in
-the Spotify app settings.
+you connected a different Spotify account, add it under **Users Management**
+in the Spotify app settings.
+</details>
+
+<details>
+<summary><b>The widget does not update, or the admin page warns that the widget push failed</b></summary>
+
+- Check that the widget is on your profile (Step 7) and that
+  `DISCORD_CLIENT_ID` is the Application ID of the app that owns the widget.
+- If your app has no widget editor, you can't have a widget right now (see
+  the warning at the top). To stop the Worker from trying, set
+  `"patchDiscordOnSync": false` in `config/app.json` and deploy again.
+- More in [docs/discord-widget.md](docs/discord-widget.md).
 </details>
 
 <details>
@@ -281,18 +362,10 @@ the Spotify app settings.
 </details>
 
 <details>
-<summary><b>The admin page rejects my password, or a link shows <code>unauthorized</code></b></summary>
+<summary><b>The admin page rejects my password (<code>Token 不正確</code>)</b></summary>
 
 The password does not match `ADMIN_TOKEN`. If you lost it, set a new one with
 `npx wrangler secret put ADMIN_TOKEN`.
-</details>
-
-<details>
-<summary><b>The Discord profile widget does not update</b></summary>
-
-See [docs/discord-widget.md](docs/discord-widget.md). New widgets can no
-longer be created; if you do not have one, set `"patchDiscordOnSync": false`
-in `config/app.json` and deploy again.
 </details>
 
 ## Updating
@@ -306,13 +379,13 @@ npm run cf:d1:migrate:remote
 npm run cf:deploy
 ```
 
-Your `wrangler.toml`, secrets, and data are kept.
+Your secrets, settings, and data are kept.
 
 ## More docs
 
 - [Admin page](docs/admin-page.md): every setting, stat, and admin route.
-- [Discord profile widget](docs/discord-widget.md): widget field names, for
-  existing widgets.
+- [Discord profile widget](docs/discord-widget.md): field names and how the
+  widget is updated.
 - [Cloudflare Worker deployment](docs/cloudflare-worker.md): the setup above
   in reference form.
 - [Backup, rollback, and history import](docs/backup-rollback-and-import.md)
@@ -343,9 +416,18 @@ npm test
 find src worker shared scripts test -name '*.js' -print0 | xargs -0 -n 1 node --check
 ```
 
-Run the Worker locally with `npm run cf:dev`. Local Node/SQLite commands
-(`npm run spotify:auth-url`, `spotify:token`, `spotify:sync`, `npm start`) read
-`.env`; copy [.env.example](.env.example) to get started.
+To run the Worker locally, apply the migrations to a local database, put the
+secrets (`DISCORD_TOKEN`, `SPOTIFY_CLIENT_SECRET`, `ADMIN_TOKEN`) in a
+`.dev.vars` file as `NAME=value` lines, and start it:
+
+```bash
+npm run cf:d1:migrate:local
+npm run cf:dev
+```
+
+The Node/SQLite commands (`npm run spotify:auth-url`, `spotify:token`,
+`spotify:sync`, `npm start`) read `.env`; copy [.env.example](.env.example) to
+get started.
 
 Known limitations:
 
