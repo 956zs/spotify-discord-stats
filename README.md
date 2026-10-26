@@ -1,424 +1,361 @@
 # Spotify Discord Stats
 
-Self-hosted Spotify listening stats for a Discord application widget and private
-Discord DM recaps.
+English | [繁體中文](README.zh-TW.md)
 
-The main deployment target is Cloudflare Workers + D1. The Worker syncs Spotify
-Recently Played every 10 minutes, stores plays in D1, patches the Discord
-application widget, and sends weekly/monthly recap DMs. A local Node/SQLite
-runtime is still available for development and migration work.
+Keep your own Spotify listening history and get a weekly and monthly recap in
+your Discord DMs. It runs for free on Cloudflare, with no server of your own.
 
-## What It Does
+- Saves every song you play on Spotify, checked every 10 minutes.
+- Sends a weekly recap every Monday and a monthly recap on the 1st, as a
+  Discord DM with your top songs, artists, albums, listening time, and habits.
+- Has a small web page (`/admin`) where you pick which stats to show and send
+  test recaps.
+- Can import your full Spotify history export, so stats go back years.
+- Can update a Discord profile widget with your stats, if your Discord app
+  still has one (see the note below).
 
-- Stores Spotify play history in SQLite/D1.
-- Patches Discord application widget dynamic fields.
-- Admin page (`/admin`) to pick the widget's stats, ranges, and copy without a redeploy.
-- Shows the last played track from Spotify Recently Played as `song`.
-- Calculates 7, 28, and 90 day stats.
-- Sends Discord DM recap reports with Components v2.
-- Imports Spotify account-data and extended streaming-history exports.
-- Provides D1 backup and rollback notes before large imports.
+![Admin page with sample data](docs/images/admin.png)
 
-There are no slash commands. Admin actions are protected by `ADMIN_TOKEN`.
+> [!IMPORTANT]
+> **About the Discord profile widget.** Discord ended its custom profile widget
+> experiment on 2026-07-27, so new widgets can no longer be created. If you
+> already have one, it keeps working for now: see
+> [docs/discord-widget.md](docs/discord-widget.md). Everything else in this
+> project works without a widget.
 
-## Requirements
+## Contents
 
-- Node.js 24+
-- Wrangler authenticated with Cloudflare
-- Cloudflare Workers + D1
-- A Discord application/bot token
-- A Spotify app using Authorization Code flow
+- [What you need](#what-you-need)
+- [Setup, step by step](#setup-step-by-step)
+- [What happens next](#what-happens-next)
+- [Import your full Spotify history](#import-your-full-spotify-history-optional)
+- [Troubleshooting](#troubleshooting)
+- [Updating](#updating)
+- [More docs](#more-docs)
+- [For developers](#for-developers)
 
-## Install
+## What you need
+
+- **Spotify Premium.** Since February 2026, Spotify requires Premium to use a
+  developer app like the one you create here.
+- **A Discord account** and a server where you can add a bot. Your own empty
+  server works; creating one is free.
+- **A free [Cloudflare](https://dash.cloudflare.com/sign-up) account.** This is
+  where the project runs.
+- **[Node.js](https://nodejs.org/) 24 or newer** on your computer, used only to
+  set things up.
+- About 30 minutes, and a terminal (Command Prompt, PowerShell, or Terminal)
+  you can paste commands into.
+
+Along the way you will collect a few values. Keep a text file open and paste
+them there as you go:
+
+| Value | You get it in |
+| --- | --- |
+| Discord Application ID | Step 2 |
+| Discord bot token (keep secret) | Step 2 |
+| Your Discord user ID | Step 2 |
+| Database ID | Step 3 |
+| Your Worker URL | Step 3 |
+| Spotify Client ID | Step 4 |
+| Spotify Client Secret (keep secret) | Step 4 |
+| Admin password (keep secret, you make it up) | Step 5 |
+
+## Setup, step by step
+
+### Step 1: Download the project
+
+Click the green **Code** button on this page, then **Download ZIP**, and unzip
+it. Or, if you use git:
+
+```bash
+git clone https://github.com/956zs/spotify-discord-stats.git
+```
+
+Open a terminal in the project folder and install what it needs:
 
 ```bash
 npm install
-cp .env.example .env
 ```
 
-Fill `.env` for local development. Cloudflare production secrets are set with
-`wrangler secret put`.
+### Step 2: Create a Discord bot
 
-Deployment guides:
+The bot is what sends you the recap DMs.
 
-- [Cloudflare Worker deployment](docs/cloudflare-worker.md) - recommended, full feature target.
-- [VPS deployment](docs/vps-deployment.md) - Node process + SQLite, useful when you want to own the machine.
-- [Backup, rollback, and Spotify history import](docs/backup-rollback-and-import.md)
-- [Recap glossary](docs/recap-glossary.md)
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
+   and click **New Application**. Give it any name, for example
+   `My Spotify Stats`.
+2. On the **General Information** page, copy the **Application ID**.
+3. Open the **Bot** page, click **Reset Token**, and copy the token. Discord
+   shows it only once. Treat it like a password.
+4. Add the bot to your server: open **OAuth2** → **URL Generator** and tick
+   the `bot` scope. Open the generated link at the bottom, pick your server,
+   and confirm.
+5. Get your own user ID: in Discord, open **User Settings** (the gear icon) →
+   **Advanced** and turn on **Developer Mode**. Then right-click your name anywhere and choose
+   **Copy User ID**.
 
-## Project Layout
+> [!NOTE]
+> The bot can only DM you if you share a server with it and that server allows
+> DMs from members (right-click the server → **Privacy Settings**).
 
-- `src/`: local Node runtime, SQLite storage, OAuth callback server, and sync loop.
-- `worker/`: Cloudflare Worker runtime, routes, D1 access, Spotify, Discord, stats, and delivery.
-- `shared/`: runtime-neutral helpers for time, keys, play parsing, songs, ranges, and recap rendering.
-- `scripts/`: D1 backup/import tools and recap prototype server.
+### Step 3: Set up Cloudflare
+
+1. Log in to Cloudflare from the terminal. A browser window opens; click
+   **Allow**.
+
+   ```bash
+   npx wrangler login
+   ```
+
+2. Make your settings file by copying the example. On Windows, use `copy`
+   instead of `cp`, or copy and rename the file in File Explorer.
+
+   ```bash
+   cp wrangler.example.toml wrangler.toml
+   ```
+
+3. Create the database:
+
+   ```bash
+   npm run cf:d1:create
+   ```
+
+   It prints a `database_id` (a long ID like `1a2b3c4d-...`). Copy it. If
+   Wrangler asks whether to add the database to your config for you, answer
+   **No**.
+4. Open `wrangler.toml` in a text editor and paste the ID into
+   `database_id = "paste-database-id-here"`. Save.
+5. Set up the database tables, then put the project online for the first time:
+
+   ```bash
+   npm run cf:d1:migrate:remote
+   npm run cf:deploy
+   ```
+
+   If this is your first Worker, Wrangler asks you to pick a `workers.dev`
+   subdomain. Any free name works.
+6. The deploy prints your **Worker URL**, something like
+   `https://spotify-discord-stats.your-name.workers.dev`. Copy it.
+
+### Step 4: Create a Spotify app
+
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard),
+   log in, and click **Create app**.
+2. Fill in:
+   - **App name** and **App description**: anything, for example
+     `My Spotify Stats`.
+   - **Redirect URIs**: your Worker URL followed by `/spotify/callback`, for
+     example `https://spotify-discord-stats.your-name.workers.dev/spotify/callback`.
+     Click **Add**.
+   - When asked which APIs you plan to use, tick **Web API**.
+3. Accept the terms and click **Save**.
+4. Open the app's **Settings**. Copy the **Client ID**, then click
+   **View client secret** and copy the **Client Secret**.
+
+> [!NOTE]
+> Sign in to Spotify in Step 6 with the same account that owns this app. To use
+> a different Spotify account, add it under **Settings** → **Users Management**
+> first.
+
+### Step 5: Fill in your settings
+
+1. Open `wrangler.toml` again and fill in the `[vars]` section with your
+   values. Keep the quotes:
+
+   ```toml
+   [vars]
+   DISCORD_CLIENT_ID = "your Discord Application ID"
+   DISCORD_USER_ID = "your Discord user ID"
+   SPOTIFY_CLIENT_ID = "your Spotify Client ID"
+   SPOTIFY_REDIRECT_URI = "your Worker URL/spotify/callback"
+   PUBLIC_BASE_URL = "your Worker URL"
+   ```
+
+2. Make up an admin password: a long random string of at least 32 characters
+   (a password manager can generate one). You use it to open the admin page.
+3. Save the three secret values in Cloudflare. Run each command, then paste the
+   value when it asks:
+
+   ```bash
+   npx wrangler secret put DISCORD_TOKEN
+   npx wrangler secret put SPOTIFY_CLIENT_SECRET
+   npx wrangler secret put ADMIN_TOKEN
+   ```
+
+   Cloudflare never shows these values again, so keep your admin password
+   somewhere safe.
+4. Deploy again so the new settings take effect:
+
+   ```bash
+   npm run cf:deploy
+   ```
+
+### Step 6: Connect your Spotify account
+
+Open this address in your browser, with your own Worker URL and admin password:
+
+```text
+https://YOUR_WORKER_URL/spotify/login?token=YOUR_ADMIN_PASSWORD
+```
+
+Spotify asks for permission to read your recently played songs. Click
+**Agree**. You should see **Spotify authorization complete**.
+
+### Step 7: Check that it works
+
+1. Open `https://YOUR_WORKER_URL/admin` and sign in with your admin password.
+2. Click **立即同步** (Sync now). The preview fills with your recent songs.
+3. Click **發送週報** (Send weekly recap). A recap DM from your bot should
+   arrive in Discord within a few seconds.
+
+Done. You can close the terminal; everything now runs on Cloudflare.
+
+## What happens next
+
+- Every 10 minutes, the Worker reads your last 50 played songs from Spotify and
+  saves new ones. Spotify only keeps a short recent history, so songs from
+  before you set this up are missing until you
+  [import your history](#import-your-full-spotify-history-optional).
+- **Weekly recap:** every Monday at 09:00, covering the last 7 days.
+- **Monthly recap:** on the 1st of each month at 09:00, covering the previous
+  month.
+- Recap times use Taiwan time (UTC+8). The time zone is not configurable yet.
+- When the Spotify connection needs renewing, the bot reminds you by DM. Repeat
+  [Step 6](#step-6-connect-your-spotify-account) when it does.
+
+Recaps can be turned off on the admin page.
+
+## Import your full Spotify history (optional)
+
+Spotify can send you everything you have ever played:
+
+1. Go to your [Spotify privacy settings](https://www.spotify.com/account/privacy/)
+   and request **Extended streaming history**. Spotify emails it to you,
+   usually within a few days and at most 30.
+2. Unzip the download.
+3. Back up the database, check the import without writing anything, then
+   import:
+
+   ```bash
+   npm run cf:d1:backup:remote
+   npm run cf:import -- --remote --dry-run /path/to/the/unzipped/folder
+   npm run cf:import -- --remote /path/to/the/unzipped/folder
+   ```
+
+4. On the admin page, click **立即同步** (Sync now) to refresh the numbers.
+
+Running the same import twice does not count songs twice. The shorter
+"Account data" export also works, but it has less detail. For overlap handling,
+cutoffs, and how to undo an import, see
+[docs/backup-rollback-and-import.md](docs/backup-rollback-and-import.md).
+
+## Troubleshooting
+
+<details>
+<summary><b>Spotify says <code>INVALID_CLIENT: Invalid redirect URI</code></b></summary>
+
+The Redirect URI in the Spotify dashboard and `SPOTIFY_REDIRECT_URI` in
+`wrangler.toml` must match exactly, including `https://` and with no trailing
+slash. Fix whichever one is wrong, then run `npm run cf:deploy` if you changed
+`wrangler.toml`.
+</details>
+
+<details>
+<summary><b>Sync fails with <code>Active premium subscription required</code> or a 403 error</b></summary>
+
+The Spotify account that owns the app needs an active Premium subscription. If
+you connected a different Spotify account, add it under **Users Management** in
+the Spotify app settings.
+</details>
+
+<details>
+<summary><b>No recap DM arrives</b></summary>
+
+- Make sure the bot is in a server you are also in.
+- In that server, allow DMs from members (right-click the server →
+  **Privacy Settings**).
+- Check that `DISCORD_USER_ID` is your user ID, not the Application ID.
+- Check that the bot token is current. Resetting it in the Developer Portal
+  invalidates the old one; run `npx wrangler secret put DISCORD_TOKEN` again.
+</details>
+
+<details>
+<summary><b>The admin page rejects my password, or a link shows <code>unauthorized</code></b></summary>
+
+The password does not match `ADMIN_TOKEN`. If you lost it, set a new one with
+`npx wrangler secret put ADMIN_TOKEN`.
+</details>
+
+<details>
+<summary><b>The Discord profile widget does not update</b></summary>
+
+See [docs/discord-widget.md](docs/discord-widget.md). New widgets can no
+longer be created; if you do not have one, set `"patchDiscordOnSync": false`
+in `config/app.json` and deploy again.
+</details>
+
+## Updating
+
+Download the new version (or `git pull`). If you downloaded a ZIP, copy your
+`wrangler.toml` from the old folder into the new one. Then run:
+
+```bash
+npm install
+npm run cf:d1:migrate:remote
+npm run cf:deploy
+```
+
+Your `wrangler.toml`, secrets, and data are kept.
+
+## More docs
+
+- [Admin page](docs/admin-page.md): every setting, stat, and admin route.
+- [Discord profile widget](docs/discord-widget.md): widget field names, for
+  existing widgets.
+- [Cloudflare Worker deployment](docs/cloudflare-worker.md): the setup above
+  in reference form.
+- [Backup, rollback, and history import](docs/backup-rollback-and-import.md)
+- [Running on your own server](docs/vps-deployment.md): a Node.js + SQLite
+  alternative to Cloudflare. It does not send scheduled recaps.
+- [Recap glossary](docs/recap-glossary.md) and
+  [ADR 0001](docs/adr/0001-discord-recap-reports.md): how recap reports are
+  designed.
+
+## For developers
+
+Project layout:
+
+- `worker/`: the Cloudflare Worker (routes, D1 access, Spotify, Discord,
+  stats, recap delivery).
+- `shared/`: runtime-neutral helpers (time, keys, play parsing, metrics,
+  recap rendering).
+- `src/`: Node.js + SQLite runtime for local development and the VPS option.
+- `scripts/`: D1 backup and history import tools.
 - `migrations/`: D1 schema migrations.
+- `config/`: default app and widget settings.
 - `test/`: Node test suite.
 
-## Spotify App
-
-Create a Spotify app in the Spotify Developer Dashboard and add the redirect URI
-you deploy with:
-
-```text
-https://spotify-stats.mimidlc.me/spotify/callback
-```
-
-The app currently needs this scope:
-
-```text
-user-read-recently-played
-```
-
-The widget uses Last Played from Recently Played, not Now Playing. That keeps
-the sync at one Spotify API read every 10 minutes instead of polling real-time
-player state.
-
-## Deployment Choices
-
-Choose one path first. Do not run both against the same Discord widget unless
-you intentionally want two processes fighting over the same profile payload.
-
-| Feature | Cloudflare Worker + D1 | VPS Node + SQLite |
-| --- | --- | --- |
-| 10-minute Spotify sync | Yes | Yes |
-| Discord widget patch | Yes | Yes |
-| Spotify OAuth callback | Yes | Yes |
-| Reauthorization DM | Yes | Yes |
-| Weekly/monthly recap DM | Yes | Not scheduled yet |
-| Spotify export import | D1 import | SQLite import |
-| Backups | D1 export / Time Travel | SQLite file backup |
-
-Recommended default: use Cloudflare Worker + D1. It is the deployment this repo
-keeps fully wired for scheduled recaps, admin routes, D1 backup, and real-send
-testing.
-
-Use VPS when you want a plain Node process with a local SQLite file and you do
-not need Worker Cron or D1.
-
-## Cloudflare Worker Quick Start
-
-Log in:
-
-```bash
-wrangler login
-wrangler whoami
-```
-
-Create and configure D1:
-
-```bash
-npm run cf:d1:create
-```
-
-Copy the returned `database_id` into [wrangler.toml](wrangler.toml).
-
-Set Worker secrets:
-
-```bash
-wrangler secret put DISCORD_TOKEN
-wrangler secret put SPOTIFY_CLIENT_SECRET
-wrangler secret put ADMIN_TOKEN
-```
-
-Give only the name; Wrangler then prompts for the value. Secrets cannot be read
-back later, so keep `ADMIN_TOKEN` somewhere safe. To generate and set one in a
-single step (bash/zsh; in fish use `set -l TOKEN (openssl rand -hex 32)`):
-
-```bash
-TOKEN=$(openssl rand -hex 32); echo "$TOKEN"; printf %s "$TOKEN" | npx wrangler secret put ADMIN_TOKEN; unset TOKEN
-```
-
-`ADMIN_TOKEN` protects these routes:
-
-```text
-/admin                      (settings page, signs in with ADMIN_TOKEN)
-/spotify/login
-/admin/sync
-/admin/stats
-/admin/recap/weekly/send
-/admin/recap/monthly/send
-```
-
-The older routes accept either `?token=ADMIN_TOKEN` or the session cookie set by
-the `/admin` sign-in.
-
-## Admin Settings Page
-
-Open `https://spotify-stats.mimidlc.me/admin` and sign in with `ADMIN_TOKEN`.
-The page edits settings at runtime, with no redeploy:
-
-- Global stats range: 7 / 28 / 90 / 365 days, a custom number of days, or all time.
-- Widget copy: username, hero title, main title, last-updated prefix.
-- Six stat slots. Each slot picks a metric, a range (follow global, a fixed
-  number of days, or all time), a label, and a value format, and slots can be
-  reordered.
-- Weekly/monthly recap DMs on or off.
-
-It also shows a live preview, a manual sync button, recap test sends, and the
-Spotify authorization status.
-
-Text fields accept placeholders: `{range}` (`4w`, `90d`, `all time`),
-`{rangeLong}` (`4 Weeks`, `All Time`), `{count}` (songs played), and `{value}`
-in slot value formats. Inside a slot, placeholders use that slot's own range.
-
-Slot metrics (defined in `shared/widget-metrics.js`):
-
-| Group | Metrics |
-| --- | --- |
-| Counts | songs played, unique songs, artists, albums |
-| Time | listening minutes, listening hours, daily minutes, daily plays, average track length |
-| Top | top song (optionally with artist), top artist, top album, and each one's play count |
-| Habits | peak hour, peak weekday, listening days, busiest day, late-night share (00:00–05:00) |
-| Discovery | new songs, new artists (first heard in the range), plays per song |
-| Streaks | current streak, longest streak |
-| Milestone | days since the first stored play |
-
-Genres and skip rates are not offered: artist genres are not stored, and
-Recently Played rows carry track length rather than time actually listened.
-
-Saved settings live in D1 (`app_state.admin_settings`) and override
-`config/app.json` / `config/widget.json`, which stay as the defaults. Signing in
-sets a 30-day session cookie signed with `ADMIN_TOKEN`, so rotating the token
-signs every session out.
-
-The Discord widget editor binds its six stats to fixed Data Fields. Each slot
-fills one pair from `config/widget.json` `fields.slots` (for example
-`Songs_Played` / `Songs_Played_Label`), whatever metric it shows. Each stat's
-Label must use Value Type `User Data` with the `_Label` field name.
-
-Only the queries the chosen slots need are run, once per distinct range. Results
-are cached per range in `app_state` and reused until a newer play arrives, the
-hour changes, or the slot selection changes. After importing older history,
-press the sync button on the admin page to refresh the cached numbers. The
-"new artists" metric needs migration `0004`.
-
-Apply migrations and deploy:
-
-```bash
-npm run cf:d1:migrate:remote
-npm run cf:deploy
-```
-
-Authorize Spotify after deploy:
-
-```text
-https://spotify-stats.mimidlc.me/spotify/login?token=YOUR_ADMIN_TOKEN
-```
-
-The callback stores the Spotify refresh token in D1.
-
-Full guide: [docs/cloudflare-worker.md](docs/cloudflare-worker.md).
-
-## VPS Quick Start
-
-VPS mode runs the local Node runtime:
-
-```bash
-npm install
-cp .env.example .env
-```
-
-Fill `.env`, then authorize Spotify:
-
-```bash
-npm run spotify:auth-url
-npm run spotify:token -- "PASTE_CODE_OR_CALLBACK_URL"
-```
-
-Run once:
-
-```bash
-npm run spotify:sync
-```
-
-Run continuously:
-
-```bash
-npm start
-```
-
-Full guide: [docs/vps-deployment.md](docs/vps-deployment.md).
-
-## Widget Fields
-
-The Discord widget editor Data Field names must match
-[config/widget.json](config/widget.json) `fields`:
-
-- `top_hero_title`
-- `during`
-- `last_updated`
-- `song`
-- `main_title`
-
-The six stats each use a value field and a label field. In the widget editor,
-set both the stat's Value and its Label to Value Type `User Data`:
-
-| Stat | Value field | Label field |
-| --- | --- | --- |
-| #1 | `Songs_Played` | `Songs_Played_Label` |
-| #2 | `Listening_Time` | `Listening_Time_Label` |
-| #3 | `Unique_Songs` | `Unique_Songs_Label` |
-| #4 | `Different_Artists` | `Different_Artists_Label` |
-| #5 | `Different_Albums` | `Different_Albums_Label` |
-| #6 | `Top_Album` | `Top_Album_Label` |
-
-These names are fixed slots: what each slot shows is chosen on the admin page,
-so `Songs_Played` may end up holding a top artist. Turning on the Label's
-Fallback in the editor keeps the card readable before the first sync.
-
-The `song` field is compact by design, for example:
-
-```text
-♪ Call of Silence
-```
-
-If the widget editor does not update immediately, reload the Discord client or
-restart the widget editor.
-
-## Recap Reports
-
-Recaps are Discord DMs rendered with Components v2:
-
-- Weekly: rolling 7 days, Monday 09:00 `Asia/Taipei`.
-- Monthly: previous natural month, every 1st day 09:00 `Asia/Taipei`.
-- Layout uses Containers, Sections, Thumbnails, Media Gallery, Separators, and
-  Text Display markdown.
-- Reports include totals, deltas, top tracks/artists/albums, new tracks,
-  listening patterns, peak day/hour, late-night percent, and streaks.
-
-Manual real-send routes:
-
-```bash
-TOKEN="$(tr -d '\n' < .cloudflare-admin-token)"
-curl -X POST "https://spotify-stats.mimidlc.me/admin/recap/weekly/send?token=${TOKEN}"
-curl -X POST "https://spotify-stats.mimidlc.me/admin/recap/monthly/send?token=${TOKEN}"
-curl -X POST "https://spotify-stats.mimidlc.me/admin/recap/monthly/send?token=${TOKEN}&month=2026-06"
-```
-
-Those routes send real Discord DMs. They are not preview routes.
-
-## Import Spotify History
-
-Spotify exports come in two useful shapes:
-
-- One-year account streaming history, usually with `endTime`, `artistName`,
-  `trackName`, and `msPlayed`.
-- Extended streaming history, usually with `ts`, `ms_played`,
-  `master_metadata_track_name`, `master_metadata_album_artist_name`,
-  `master_metadata_album_album_name`, and `spotify_track_uri`.
-
-The importer supports both. Extended streaming history is better because it has
-album names and Spotify Track URI more often.
-
-Before importing remote D1, read
-[docs/backup-rollback-and-import.md](docs/backup-rollback-and-import.md).
-
-Dry run:
-
-```bash
-npm run cf:import -- --remote --dry-run /path/to/extracted/spotify/export
-```
-
-If the export overlaps with rows already synced from the Spotify API, use a
-cutoff:
-
-```bash
-npm run cf:import -- --remote --dry-run --before 2026-07-05T13:02:33.723Z /path/to/extracted/spotify/export
-```
-
-Backup:
-
-```bash
-npm run cf:d1:backup:remote
-```
-
-Import:
-
-```bash
-npm run cf:import -- --remote /path/to/extracted/spotify/export
-```
-
-Imports deduplicate overlap by `played_at + track_key`. Re-running the same
-export should not double-count plays.
-
-One-year account-data exports usually do not include Spotify Track URI and use
-minute-level timestamps, so they may not deduplicate perfectly against rows that
-were already synced through the Web API. Prefer `--before` for the overlap
-window.
-
-## Backup And Rollback
-
-Worker code rollback:
-
-```bash
-/usr/bin/wrangler versions list --name spotify-discord-stats
-/usr/bin/wrangler rollback --name spotify-discord-stats VERSION_ID
-```
-
-D1 backup:
-
-```bash
-npm run cf:d1:backup:remote
-```
-
-D1 point-in-time restore:
-
-```bash
-/usr/bin/wrangler d1 time-travel info spotify-discord-stats --timestamp="2026-07-09T05:00:00Z"
-/usr/bin/wrangler d1 time-travel restore spotify-discord-stats --timestamp="2026-07-09T05:00:00Z"
-```
-
-D1 restore is destructive and restores the whole database. For deleting only one
-bad Spotify export import, use the targeted SQL in
-[docs/backup-rollback-and-import.md](docs/backup-rollback-and-import.md).
-
-## Commands
-
-```bash
-npm test
-npm run spotify:auth-url
-npm run spotify:token -- "PASTE_CODE_OR_CALLBACK_URL"
-npm run spotify:sync
-npm run spotify:import -- /path/to/extracted/history
-npm run cf:dev
-npm run cf:deploy
-npm run cf:d1:migrate:remote
-npm run cf:d1:backup:remote
-npm run cf:import -- --remote /path/to/extracted/history
-npm run prototype:recap-demo
-```
-
-## Local Runtime
-
-Local Node/SQLite works for development and is the same runtime used by the VPS
-deployment:
-
-```bash
-npm run spotify:auth-url
-npm run spotify:token -- "PASTE_CODE_OR_CALLBACK_URL"
-npm run spotify:sync
-npm start
-```
-
-Local data is stored under `data/` by default and is gitignored.
-
-## Testing
-
-Run tests and syntax checks:
+Run the tests and a syntax check:
 
 ```bash
 npm test
 find src worker shared scripts test -name '*.js' -print0 | xargs -0 -n 1 node --check
 ```
 
-Backend tests should finish quickly; keep `timeout 60 npm test` for automation.
+Run the Worker locally with `npm run cf:dev`. Local Node/SQLite commands
+(`npm run spotify:auth-url`, `spotify:token`, `spotify:sync`, `npm start`) read
+`.env`; copy [.env.example](.env.example) to get started.
 
-## Notes
+Known limitations:
 
-- Spotify export imports do not include album artwork. API-synced rows can store
-  album artwork from Spotify track metadata.
-- Discord DMs require the bot to share a server with the target user and for DMs
-  to be allowed.
-- Spotify may reject Recently Played API calls if the Spotify app owner's
-  Premium subscription is inactive.
+- The admin page interface is in Traditional Chinese.
+- Recap schedules use `Asia/Taipei`.
+- Spotify's Recently Played API returns track length, not time actually
+  listened, so listening time from synced plays is an estimate. Imported
+  history has exact play time.
+- Spotify history exports do not include album artwork.
+
+## License
+
+[MIT](LICENSE)
