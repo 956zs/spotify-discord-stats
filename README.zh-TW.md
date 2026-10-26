@@ -32,6 +32,7 @@
 - [設定完之後](#設定完之後)
 - [匯入完整的 Spotify 歷史（選用）](#匯入完整的-spotify-歷史選用)
 - [常見問題](#常見問題)
+- [疑難排解](#疑難排解)
 - [更新版本](#更新版本)
 - [更多文件](#更多文件)
 - [給開發者](#給開發者)
@@ -314,6 +315,92 @@ Spotify 可以把你所有的播放紀錄寄給你：
 要撤銷一次匯入，請看 [docs/backup-rollback-and-import.md](docs/backup-rollback-and-import.md)（英文）。
 
 ## 常見問題
+
+<details>
+<summary><b>在 Spotify Developer Dashboard 找不到 Create app</b></summary>
+
+- **不是 Premium。** 從 2026 年 2 月起，免費的 Spotify 帳號不能建立開發者 app。
+- **email 還沒驗證。** 頁面上會寫「You need to verify your email address before you can create an app」。
+  請先驗證 Spotify 帳號的 email。如果你是用 Google、Facebook 或 Apple 登入，可能收不到驗證信，
+  要先到[登入方式](https://www.spotify.com/account/login-methods/)加一個「email 和密碼」的登入方式。
+- **已經有 app 了。** Spotify 會限制每個人能建立的 app 數量。可以直接拿已經有的 app 來用，
+  把這個專案的 Redirect URI 加進去就好。
+- 有些 Premium 帳號還是看不到這個按鈕，這是 Spotify 那邊的問題，可以到
+  [Spotify for Developers 論壇](https://community.spotify.com/t5/Spotify-for-Developers/bd-p/Spotify_Developer)詢問。
+</details>
+
+<details>
+<summary><b>要花錢嗎？</b></summary>
+
+不用。它在 Cloudflare 的免費方案內就能跑（Workers、Cron Triggers 和 D1）。
+唯一的條件是 Spotify Premium，因為 Spotify 規定開發者 app 要有 Premium。
+</details>
+
+<details>
+<summary><b>需要自己的網域嗎？</b></summary>
+
+不用，免費的 `workers.dev` 網址就能用。想用自己的網域的話，先把網域加到 Cloudflare，
+再把 `wrangler.toml` 裡的 `routes` 取消註解。
+</details>
+
+<details>
+<summary><b>現在還能做新的個人檔案 widget 嗎？</b></summary>
+
+大概不行：Discord 在 2026-07-27 結束了自訂 widget 的實驗，新的 app 拿不到 widget 編輯器，
+見最上面的警告。沒有 widget 的話，回顧私訊、統計和 admin 頁都照常能用。
+</details>
+
+<details>
+<summary><b>朋友可以共用我架好的這套嗎？</b></summary>
+
+不行。一套只會追蹤一個 Spotify 帳號，也只會更新一個 Discord 使用者的個人檔案。
+朋友要用的話，得各自架一套，用自己的 Discord app、Spotify app 和 Cloudflare 帳號。
+</details>
+
+<details>
+<summary><b>widget 會即時顯示我正在聽的歌嗎？</b></summary>
+
+不會。它顯示的是你最近聽完的那首歌，每 10 分鐘檢查一次。Discord 的 widget 本來就不是拿來顯示即時資料的。
+</details>
+
+<details>
+<summary><b>為什麼聽歌時間跟 Spotify Wrapped 對不上？</b></summary>
+
+Spotify 的最近播放清單只給每首歌的長度，不是你實際聽了多久，所以同步來的聽歌時間是以整首歌計算的。
+匯入的歷史紀錄才有精確的播放時間。
+</details>
+
+<details>
+<summary><b>可以改週報、月報的寄送時間嗎？</b></summary>
+
+可以。修改 [config/app.json](config/app.json) 裡的 `recapReports`，再部署一次：
+`weeklyDay`（0 是星期日，1 是星期一，以此類推）、`monthlyDay`、`sendHour` 和 `sendMinute`（要是 10 的倍數）。
+時間以台灣時間（UTC+8）計算，時區本身目前還不能改。
+</details>
+
+<details>
+<summary><b>我的資料誰看得到？</b></summary>
+
+聽歌紀錄存在你自己的 Cloudflare 資料庫裡。admin 頁和管理路由都要用你的管理密碼才能進去。
+Spotify 只允許 Worker 讀取你最近播放的歌曲。widget 上顯示的內容，任何打開你 Discord 個人檔案的人都看得到。
+</details>
+
+<details>
+<summary><b>要怎麼整個移除？</b></summary>
+
+1. 刪掉 Worker 和它的資料庫：
+
+   ```bash
+   npx wrangler delete
+   npx wrangler d1 delete spotify-discord-stats
+   ```
+
+2. 到 [spotify.com/account/apps](https://www.spotify.com/account/apps/) 移除這個 app 的存取權，
+   再到 Spotify Developer Dashboard 刪掉 app。
+3. 把 widget 從 Discord 個人檔案移除，再到 Discord Developer Portal 刪掉 app。
+</details>
+
+## 疑難排解
 
 <details>
 <summary><b>Spotify 顯示 <code>INVALID_CLIENT: Invalid redirect URI</code></b></summary>

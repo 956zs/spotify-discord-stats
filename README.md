@@ -37,6 +37,7 @@ no server of your own.
 - [Choosing what the widget shows](#choosing-what-the-widget-shows)
 - [What happens next](#what-happens-next)
 - [Import your full Spotify history](#import-your-full-spotify-history-optional)
+- [FAQ](#faq)
 - [Troubleshooting](#troubleshooting)
 - [Updating](#updating)
 - [More docs](#more-docs)
@@ -363,6 +364,103 @@ already saved by the Worker are not counted twice, and running the same import
 again does not add anything. The shorter "Account data" export also works, but
 it has less detail. To undo an import, see
 [docs/backup-rollback-and-import.md](docs/backup-rollback-and-import.md).
+
+## FAQ
+
+<details>
+<summary><b>I can't find Create app on the Spotify Developer Dashboard</b></summary>
+
+- **No Premium.** Since February 2026, free Spotify accounts can't create
+  developer apps.
+- **Email not verified.** The dashboard says "You need to verify your email
+  address before you can create an app". Verify the email on your Spotify
+  account. If you sign in with Google, Facebook, or Apple, you may not get the
+  verification email; add an email-and-password sign-in under
+  [Login methods](https://www.spotify.com/account/login-methods/) first.
+- **You already have an app.** Spotify limits how many apps you can create.
+  You can reuse an app you already have: add this project's Redirect URI to it.
+- Some Premium accounts still don't see the button; that is on Spotify's side.
+  Ask on the [Spotify for Developers forum](https://community.spotify.com/t5/Spotify-for-Developers/bd-p/Spotify_Developer).
+</details>
+
+<details>
+<summary><b>Does it cost anything?</b></summary>
+
+No. It runs within Cloudflare's free plan (Workers, Cron Triggers, and D1).
+You only need Spotify Premium, which Spotify requires for developer apps.
+</details>
+
+<details>
+<summary><b>Do I need my own domain?</b></summary>
+
+No. The free `workers.dev` address works. To use your own domain, add it to
+Cloudflare and uncomment `routes` in `wrangler.toml`.
+</details>
+
+<details>
+<summary><b>Can I still create a new profile widget?</b></summary>
+
+Probably not: Discord ended the custom widget experiment on 2026-07-27 and new
+apps don't get the widget editor. See the warning at the top. Recap DMs, stats,
+and the admin page work without a widget.
+</details>
+
+<details>
+<summary><b>Can my friends use my setup?</b></summary>
+
+No. One setup follows one Spotify account and updates one Discord user's
+profile. Each friend sets up their own copy with their own Discord app,
+Spotify app, and Cloudflare account.
+</details>
+
+<details>
+<summary><b>Does the widget show what I'm playing right now?</b></summary>
+
+No. It shows the last song you finished, checked every 10 minutes. Discord
+widgets aren't meant for live data.
+</details>
+
+<details>
+<summary><b>Why doesn't my listening time match Spotify Wrapped?</b></summary>
+
+Spotify's Recently Played list gives each song's length, not how long you
+actually listened, so synced listening time counts whole songs. Imported
+history has the exact play time.
+</details>
+
+<details>
+<summary><b>Can I change when the recaps arrive?</b></summary>
+
+Yes, by editing `recapReports` in [config/app.json](config/app.json) and
+deploying again: `weeklyDay` (0 = Sunday, 1 = Monday, ...), `monthlyDay`,
+`sendHour`, and `sendMinute` (a multiple of 10). Times are in Taiwan time
+(UTC+8); the time zone itself can't be changed yet.
+</details>
+
+<details>
+<summary><b>Who can see my data?</b></summary>
+
+Your plays are stored in your own Cloudflare database. The admin page and its
+routes need your admin password. Spotify only lets the Worker read your
+recently played songs. Anyone who opens your Discord profile sees what the
+widget shows.
+</details>
+
+<details>
+<summary><b>How do I remove everything?</b></summary>
+
+1. Delete the Worker and its database:
+
+   ```bash
+   npx wrangler delete
+   npx wrangler d1 delete spotify-discord-stats
+   ```
+
+2. Remove the app's access at [spotify.com/account/apps](https://www.spotify.com/account/apps/)
+   and delete the app in the Spotify Developer Dashboard.
+3. Remove the widget from your Discord profile, then delete the app in the
+   Discord Developer Portal.
+</details>
 
 ## Troubleshooting
 
