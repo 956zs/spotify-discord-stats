@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
-import { spawnSync } from 'node:child_process';
+import { runWrangler } from './wrangler.js';
 import { exportRowToPlayRecords } from '../shared/play-records.js';
 
 const CHUNK_INDEX_PAD_WIDTH = 4;
@@ -80,16 +80,7 @@ function executeChunk() {
     return;
   }
 
-  const args = ['d1', 'execute', options.dbName, options.remote ? '--remote' : '--local', '--file', filePath];
-  console.log(`wrangler ${args.join(' ')}`);
-  const result = spawnSync('wrangler', args, {
-    stdio: 'inherit',
-    cwd: process.cwd()
-  });
-
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
-  }
+  runWrangler(['d1', 'execute', options.dbName, options.remote ? '--remote' : '--local', '--yes', '--file', filePath]);
 }
 
 function exportRowToSql(row) {

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { spawnSync } from 'node:child_process';
+import { runWrangler } from './wrangler.js';
 
 const DEFAULT_DB_NAME = 'spotify-discord-stats';
 const DEFAULT_OUTPUT_DIR = 'backups/d1';
@@ -28,10 +28,7 @@ function runWranglerExport(outputPath) {
     args.push('--table', table);
   }
 
-  const result = spawnSync('wrangler', args, { stdio: 'inherit', cwd: process.cwd() });
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
-  }
+  runWrangler(args);
 }
 
 function defaultOutputPath(options) {
