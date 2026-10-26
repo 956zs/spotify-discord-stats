@@ -22,8 +22,14 @@ widget editor and filled with data by the Worker.
 
 The short version is [Step 7 of the README](../README.md#step-7-set-up-the-profile-widget):
 paste [discord-widget-config.json](discord-widget-config.json) into the editor
-with **⋮** → **Paste config from clipboard**, upload the three images, save,
-and add the widget to your profile.
+with **⋮** → **Paste config from clipboard**, upload the three images, save and
+publish, then apply the application identity and add the widget to your
+profile. The last two steps rely on workarounds from the custom widget
+experiment; chloecinders'
+[How to Make Discord Widgets](https://chloecinders.com/blog/discord-widgets)
+walks through them, including the
+[Adding the Widget to your Profile](https://chloecinders.com/blog/discord-widgets#displaying-the-widget-on-your-profile)
+section.
 
 ![Widget editor](images/widget-editor.png)
 
@@ -33,7 +39,7 @@ The config uses three application assets. Upload images with these names under
 | Asset name | Where it shows |
 | --- | --- |
 | `widget_hero` | The large picture on the widget |
-| `widget_preview` | The picture in Discord's **Add Widget** list |
+| `widget_preview` | The preview picture in Discord's widget picker |
 | `widget_mini` | The picture on your mini profile |
 
 Discord's own guide to the editor:
