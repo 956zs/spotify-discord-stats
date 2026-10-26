@@ -387,11 +387,14 @@ it has less detail. To undo an import, see
   Ask on the [Spotify for Developers forum](https://community.spotify.com/t5/Spotify-for-Developers/bd-p/Spotify_Developer).
 
 **Workaround without Premium:** Spotify only requires the app's owner to have
-Premium. A friend with Premium can add your Spotify email to their app under
-**User Management** (up to 5 users per app), add your Worker's
-`/spotify/callback` URL to its Redirect URIs, and give you the app's Client ID
-and Client Secret. Only do this with people you trust: whoever has the Client
-Secret can act as that app.
+Premium. Someone with Premium (a friend, or your plan manager) can add your
+Spotify email to their app under **User Management** (up to 5 users per app),
+add your Worker's `/spotify/callback` URL to its Redirect URIs, and give you the
+app's Client ID and Client Secret. In Step 6, connect your own Spotify account
+(sign out of theirs first): the Worker records whichever account you connect,
+not the app owner's. Only do this with people you trust: whoever has the Client
+Secret can act as that app, and the app stops working if the owner's Premium
+lapses.
 </details>
 
 <details>

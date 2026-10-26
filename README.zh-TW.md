@@ -331,10 +331,11 @@ Spotify 可以把你所有的播放紀錄寄給你：
 - 有些 Premium 帳號還是看不到這個按鈕，這是 Spotify 那邊的問題，可以到
   [Spotify for Developers 論壇](https://community.spotify.com/t5/Spotify-for-Developers/bd-p/Spotify_Developer)詢問。
 
-**沒有 Premium 的變通方法**：Spotify 只要求 app 的擁有者有 Premium。有 Premium 的朋友可以在他的 app 的
-**User Management** 加入你的 Spotify email（每個 app 最多 5 人），在 Redirect URIs 加上你的 Worker 網址加
-`/spotify/callback`，再把 app 的 Client ID 和 Client Secret 給你。只跟信得過的人這樣做：
-拿到 Client Secret 的人就能以那個 app 的身分操作。
+**沒有 Premium 的變通方法**：Spotify 只要求 app 的擁有者有 Premium。有 Premium 的人（朋友，或你的方案管理者）
+可以在他的 app 的 **User Management** 加入你的 Spotify email（每個 app 最多 5 人），在 Redirect URIs 加上你的
+Worker 網址加 `/spotify/callback`，再把 app 的 Client ID 和 Client Secret 給你。第 6 步連結 Spotify 時，
+用你自己的帳號登入（先登出對方的帳號）：Worker 記錄的是你連結的那個帳號，不是 app 擁有者的。
+只跟信得過的人這樣做：拿到 Client Secret 的人就能以那個 app 的身分操作，而且擁有者的 Premium 一斷，app 就會停。
 </details>
 
 <details>
