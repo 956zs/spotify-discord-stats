@@ -188,9 +188,10 @@ The profile widget belongs to this app, and its bot sends you the recap DMs.
    <img src="docs/images/spotify-settings.png" alt="Spotify app settings with the Client ID and View client secret" width="640">
 
 > [!NOTE]
-> Connect Spotify in Step 6 with the same account that owns this app. To use a
-> different Spotify account, add it under **Settings** → **User Management**
-> first.
+> The stats come from the Spotify account you sign in with in Step 6, not
+> from the account that owns this app. They can be the same account. If they
+> differ, add the account you will sign in with under **Settings** →
+> **User Management** first.
 
 ### Step 5: Fill in your settings
 

@@ -166,8 +166,8 @@ npm install
    <img src="docs/images/spotify-settings.png" alt="Spotify app 設定頁的 Client ID 和 View client secret" width="640">
 
 > [!NOTE]
-> 第 6 步連結 Spotify 時，請用建立這個 app 的同一個 Spotify 帳號。要用別的帳號的話，
-> 先到 **Settings** → **User Management** 把它加進去。
+> 統計的是第 6 步連結時登入的那個 Spotify 帳號，不是建立這個 app 的帳號。兩個可以是同一個；
+> 如果不同，要先到 **Settings** → **User Management** 把你要登入的那個帳號加進去。
 
 ### 第 5 步：填入設定
 
