@@ -14,13 +14,13 @@ can still add unwanted rows. Capture a rollback point before importing.
 List deployed Worker versions:
 
 ```bash
-/usr/bin/wrangler versions list --name spotify-discord-stats
+npx wrangler versions list --name spotify-discord-stats
 ```
 
 Roll back to a known good version:
 
 ```bash
-/usr/bin/wrangler rollback --name spotify-discord-stats VERSION_ID
+npx wrangler rollback --name spotify-discord-stats VERSION_ID
 ```
 
 This only changes the Worker code. It does not roll back D1 rows.
@@ -40,13 +40,13 @@ date -u +"%Y-%m-%dT%H:%M:%SZ"
 Check the matching Time Travel bookmark:
 
 ```bash
-/usr/bin/wrangler d1 time-travel info spotify-discord-stats --timestamp="2026-07-09T05:00:00Z"
+npx wrangler d1 time-travel info spotify-discord-stats --timestamp="2026-07-09T05:00:00Z"
 ```
 
 Restore the whole database to that point:
 
 ```bash
-/usr/bin/wrangler d1 time-travel restore spotify-discord-stats --timestamp="2026-07-09T05:00:00Z"
+npx wrangler d1 time-travel restore spotify-discord-stats --timestamp="2026-07-09T05:00:00Z"
 ```
 
 This is destructive: it overwrites the whole database, including OAuth state,
@@ -187,19 +187,19 @@ if you may want to remove only that import later.
 Verify row counts:
 
 ```bash
-/usr/bin/wrangler d1 execute spotify-discord-stats --remote --command "SELECT source, COUNT(*) AS plays FROM plays GROUP BY source;"
+npx wrangler d1 execute spotify-discord-stats --remote --command "SELECT source, COUNT(*) AS plays FROM plays GROUP BY source;"
 ```
 
 Check latest rows:
 
 ```bash
-/usr/bin/wrangler d1 execute spotify-discord-stats --remote --command "SELECT played_at, track_name, album_name, source FROM plays ORDER BY played_at_ms DESC LIMIT 10;"
+npx wrangler d1 execute spotify-discord-stats --remote --command "SELECT played_at, track_name, album_name, source FROM plays ORDER BY played_at_ms DESC LIMIT 10;"
 ```
 
 Find the first API-synced row before choosing an import cutoff:
 
 ```bash
-/usr/bin/wrangler d1 execute spotify-discord-stats --remote --command "SELECT MIN(played_at) AS first_api, MAX(played_at) AS last_api, COUNT(*) AS api_rows FROM plays WHERE source = 'spotify_api';"
+npx wrangler d1 execute spotify-discord-stats --remote --command "SELECT MIN(played_at) AS first_api, MAX(played_at) AS last_api, COUNT(*) AS api_rows FROM plays WHERE source = 'spotify_api';"
 ```
 
 ## Roll Back Only One Export Import
@@ -240,7 +240,7 @@ COMMIT;
 Run it through Wrangler:
 
 ```bash
-/usr/bin/wrangler d1 execute spotify-discord-stats --remote --file rollback-import.sql
+npx wrangler d1 execute spotify-discord-stats --remote --file rollback-import.sql
 ```
 
 This targeted rollback only removes rows that were newly inserted by that import
@@ -252,8 +252,7 @@ When Spotify API access is working, force one sync to refresh stats and patch th
 Discord widget:
 
 ```bash
-TOKEN="$(tr -d '\n' < .cloudflare-admin-token)"
-curl -fsS "https://spotify-stats.mimidlc.me/admin/sync?token=${TOKEN}"
+curl -fsS "https://YOUR_WORKER_URL/admin/sync?token=YOUR_ADMIN_TOKEN"
 ```
 
 If Spotify still returns `Active premium subscription required`, wait until the

@@ -36,20 +36,21 @@ process and local SQLite storage.
 
 ```bash
 npm install
-wrangler login
+cp wrangler.example.toml wrangler.toml
+npx wrangler login
 npm run cf:d1:create
-# Copy the returned database_id into wrangler.toml before continuing.
+# Copy the returned database_id and your IDs into wrangler.toml before continuing.
 npm run cf:d1:migrate:remote
-wrangler secret put DISCORD_TOKEN
-wrangler secret put SPOTIFY_CLIENT_SECRET
-wrangler secret put ADMIN_TOKEN
+npx wrangler secret put DISCORD_TOKEN
+npx wrangler secret put SPOTIFY_CLIENT_SECRET
+npx wrangler secret put ADMIN_TOKEN
 npm run cf:deploy
 ```
 
 After deploy, open:
 
 ```text
-https://spotify-stats.mimidlc.me/spotify/login?token=YOUR_ADMIN_TOKEN
+https://YOUR_WORKER_URL/spotify/login?token=YOUR_ADMIN_TOKEN
 ```
 
 ## Required Cloudflare Auth
@@ -57,8 +58,8 @@ https://spotify-stats.mimidlc.me/spotify/login?token=YOUR_ADMIN_TOKEN
 Run this locally and finish the browser authorization:
 
 ```bash
-wrangler login
-wrangler whoami
+npx wrangler login
+npx wrangler whoami
 ```
 
 ## Create D1
@@ -67,7 +68,8 @@ wrangler whoami
 npm run cf:d1:create
 ```
 
-Copy the returned `database_id` into [wrangler.toml](../wrangler.toml):
+Copy [wrangler.example.toml](../wrangler.example.toml) to `wrangler.toml` (it is
+gitignored), then paste the returned `database_id` into it:
 
 ```toml
 [[d1_databases]]
@@ -78,37 +80,31 @@ database_id = "paste-database-id-here"
 
 ## Configure Worker Vars
 
-Edit [wrangler.toml](../wrangler.toml):
+Edit `wrangler.toml`:
 
 ```toml
 [vars]
 DISCORD_CLIENT_ID = "your-discord-application-id"
 DISCORD_USER_ID = "your-discord-user-id"
 SPOTIFY_CLIENT_ID = "your-spotify-client-id"
-PUBLIC_BASE_URL = "https://spotify-stats.mimidlc.me"
-SPOTIFY_REDIRECT_URI = "https://spotify-stats.mimidlc.me/spotify/callback"
+PUBLIC_BASE_URL = "https://YOUR_WORKER_URL"
+SPOTIFY_REDIRECT_URI = "https://YOUR_WORKER_URL/spotify/callback"
 ```
 
-This project is configured to use:
+`YOUR_WORKER_URL` is where the Worker is served: either the free
+`spotify-discord-stats.<your-subdomain>.workers.dev` address that
+`npm run cf:deploy` prints, or your own domain if you uncomment `routes` in
+`wrangler.toml`.
 
-```text
-https://spotify-stats.mimidlc.me
-```
-
-The Spotify redirect URI is:
-
-```text
-https://spotify-stats.mimidlc.me/spotify/callback
-```
-
-Add the exact redirect URI to the Spotify Developer Dashboard.
+Add the exact redirect URI (`https://YOUR_WORKER_URL/spotify/callback`) to the
+Spotify Developer Dashboard.
 
 ## Set Worker Secrets
 
 ```bash
-wrangler secret put DISCORD_TOKEN
-wrangler secret put SPOTIFY_CLIENT_SECRET
-wrangler secret put ADMIN_TOKEN
+npx wrangler secret put DISCORD_TOKEN
+npx wrangler secret put SPOTIFY_CLIENT_SECRET
+npx wrangler secret put ADMIN_TOKEN
 ```
 
 `ADMIN_TOKEN` protects `/admin` (the settings page), `/spotify/login`, and the
@@ -139,7 +135,7 @@ npm run cf:deploy
 Open:
 
 ```text
-https://spotify-stats.mimidlc.me/spotify/login?token=YOUR_ADMIN_TOKEN
+https://YOUR_WORKER_URL/spotify/login?token=YOUR_ADMIN_TOKEN
 ```
 
 After Spotify redirects back to `/spotify/callback`, the refresh token is saved
