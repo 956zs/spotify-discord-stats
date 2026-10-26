@@ -242,6 +242,10 @@ The profile widget belongs to this app, and its bot sends you the recap DMs.
 
 ### Step 7: Set up the profile widget
 
+Custom widgets come from a Discord experiment, so part of the setup uses
+workarounds. chloecinders' guide [How to Make Discord Widgets](https://chloecinders.com/blog/discord-widgets) covers
+them in detail. Follow it, with two shortcuts from this project:
+
 1. In the [Discord Developer Portal](https://discord.com/developers/applications),
    open your app. In the left menu under **Games**, click **Widget**.
 
@@ -249,23 +253,29 @@ The profile widget belongs to this app, and its bot sends you the recap DMs.
    > editor (see the warning at the top). Skip to Step 8; everything except the
    > widget works.
 
-2. Open [docs/discord-widget-config.json](docs/discord-widget-config.json) and
-   copy all of it (on GitHub, use the **Copy raw file** button). In the widget
+2. **Shortcut 1:** instead of building the widget by hand, open
+   [docs/discord-widget-config.json](docs/discord-widget-config.json) and copy
+   all of it (on GitHub, use the **Copy raw file** button). In the widget
    editor, click the **⋮** button at the top right and choose
    **Paste config from clipboard**. This sets up every field with the right
    name.
 
    <img src="docs/images/widget-menu.png" alt="Widget editor menu with Paste config from clipboard" width="360">
+
 3. The widget shows three pictures. Upload your own images under **Games** →
    **Assets** with the names `widget_hero` (the big picture on the widget),
    `widget_preview`, and `widget_mini`, or pick other images in the editor.
-4. Click **Save changes**. You don't need to publish: as the app's owner you
-   can add an unpublished widget to your own profile.
-5. In Discord, open your full profile and click **Add Widget**. Choose
-   **Game Stats**, find your app, and click **Add to profile**. If Discord asks
-   you to link your account, click **Link your account** and allow it.
+4. Click **Save changes**, then **Publish**. Other people only see published
+   widgets.
+5. Apply the application identity and add the widget to your profile as the
+   guide explains in [Adding the Widget to your Profile](https://chloecinders.com/blog/discord-widgets#displaying-the-widget-on-your-profile).
+   **Shortcut 2:** you don't need to keep the guide's sample data up to date;
+   the Worker sends your real stats every 10 minutes.
 
-   <img src="docs/images/discord-add-widget.png" alt="Add Profile Widget dialog with the Game Stats list" width="520">
+> [!CAUTION]
+> Never paste your bot token into a website. The guide's Widget Identity
+> Creator is a small app that runs on your own computer, so the token stays on
+> your device.
 
 <img src="docs/images/widget-editor.png" alt="Widget editor after pasting the config" width="720">
 

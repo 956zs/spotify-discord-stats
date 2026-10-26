@@ -212,27 +212,33 @@ npm install
 
 ### 第 7 步：設定個人檔案 widget
 
+自訂 widget 來自 Discord 的實驗功能，所以有一部分設定要用變通的方法。chloecinders 的教學
+[How to Make Discord Widgets](https://chloecinders.com/blog/discord-widgets)（英文）講得很完整，照著它做，再搭配這個專案的兩個捷徑：
+
 1. 在 [Discord Developer Portal](https://discord.com/developers/applications)
    打開你的 app，在左邊選單的 **Games** 底下點 **Widget**。
 
    > 如果沒有 **Widget** 這個選項，代表 Discord 沒有開放 widget 編輯器給你的 app
    > （見最上面的警告）。直接跳到第 8 步，除了 widget 以外都能用。
 
-2. 打開 [docs/discord-widget-config.json](docs/discord-widget-config.json)，
+2. **捷徑 1**：不用自己一格一格建，打開
+   [docs/discord-widget-config.json](docs/discord-widget-config.json)，
    把內容全部複製起來（在 GitHub 上可以按 **Copy raw file** 按鈕）。在 widget 編輯器右上角按
    **⋮**，選 **Paste config from clipboard**。所有欄位會一次設定好，名稱也都對。
 
    <img src="docs/images/widget-menu.png" alt="widget 編輯器選單裡的 Paste config from clipboard" width="360">
+
 3. widget 上有三張圖。到 **Games** → **Assets** 上傳你自己的圖片，分別命名為
    `widget_hero`（widget 上的大圖）、`widget_preview` 和 `widget_mini`，
    或是在編輯器裡改選別的圖。
-4. 按 **Save changes**。不需要發佈：你是 app 的擁有者，可以直接把還沒發佈的 widget
-   加到自己的個人檔案。
-5. 在 Discord 打開你的完整個人檔案，按 **Add Widget**，選 **Game Stats**，
-   找到你的 app，按 **Add to profile**。如果 Discord 要你連結帳號，按
-   **Link your account** 並同意授權。
+4. 按 **Save changes**，再按 **Publish**。沒有發佈的 widget 別人看不到。
+5. 照教學的 [Adding the Widget to your Profile](https://chloecinders.com/blog/discord-widgets#displaying-the-widget-on-your-profile) 段落，
+   套用 application identity，並把 widget 加到你的個人檔案。
+   **捷徑 2**：教學裡的範例資料不用自己維護，Worker 每 10 分鐘會送你真正的統計上去。
 
-   <img src="docs/images/discord-add-widget.png" alt="Add Profile Widget 視窗的 Game Stats 清單" width="520">
+> [!CAUTION]
+> 不要把 bot token 貼到任何網站上。教學裡的 Widget Identity Creator 是在你自己電腦上執行的小程式，
+> token 不會離開你的裝置。
 
 <img src="docs/images/widget-editor.png" alt="貼上 config 後的 widget 編輯器" width="720">
 
