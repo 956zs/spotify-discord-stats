@@ -8,6 +8,7 @@
 不需要自己的伺服器。
 
 <img src="docs/images/widget.png" alt="顯示四週 Spotify 統計的個人檔案 widget" width="480">
+<img src="docs/images/widget-mini.png" alt="同一個 widget 在小卡片上的樣子" width="300">
 
 - **個人檔案 widget**：最近播放的歌，加上六項統計，例如播放次數、聽歌時間、歌手數、
   最常聽的專輯，區間可以是 4 週或任何長度。
@@ -87,11 +88,20 @@ npm install
 
 1. 打開 [Discord Developer Portal](https://discord.com/developers/applications)，
    按 **New Application**。名字會顯示在 widget 上，例如 `My Spotify Stats`。
+
+   <img src="docs/images/portal-new-app.png" alt="建立新 app 的視窗" width="380">
+
 2. 在 **General Information** 頁面複製 **Application ID**。
+
+   <img src="docs/images/portal-app-id.png" alt="Application ID 和 Copy 按鈕" width="380">
 3. 打開 **Bot** 頁面，按 **Reset Token**，複製 token。這個 token 只會顯示一次，
    請當成密碼保管。
+
+   <img src="docs/images/portal-bot-token.png" alt="Bot 頁的 Reset Token 按鈕" width="520">
 4. 把 bot 加進你的伺服器：打開 **OAuth2** → **URL Generator**，勾選 `bot`，
    權限不用勾。打開最下面產生的連結，選你的伺服器，按 **繼續**，再按 **授權**。
+
+   <img src="docs/images/portal-oauth2.png" alt="勾選 bot 的 OAuth2 URL Generator" width="640">
 5. 取得你自己的使用者 ID：在 Discord 打開 **使用者設定**（齒輪圖示）→ **進階**，
    開啟 **開發者模式**。接著在任何地方對自己的名字按右鍵，選 **複製使用者 ID**。
 
@@ -146,13 +156,17 @@ npm install
      `https://spotify-discord-stats.your-name.workers.dev/spotify/callback`，
      然後按 **Add**。
    - 問你打算用哪些 API 時，勾選 **Web API**。
+
+   <img src="docs/images/spotify-create.png" alt="填好的 Spotify Create app 表單" width="640">
 3. 同意條款，按 **Save**。
 4. 打開這個 app 的 **Settings**，複製 **Client ID**，再按 **View client secret**
    複製 **Client Secret**。
 
+   <img src="docs/images/spotify-settings.png" alt="Spotify app 設定頁的 Client ID 和 View client secret" width="640">
+
 > [!NOTE]
 > 第 6 步連結 Spotify 時，請用建立這個 app 的同一個 Spotify 帳號。要用別的帳號的話，
-> 先到 **Settings** → **Users Management** 把它加進去。
+> 先到 **Settings** → **User Management** 把它加進去。
 
 ### 第 5 步：填入設定
 
@@ -191,6 +205,8 @@ npm install
 1. 打開你的 Worker 網址加上 `/admin`，例如
    `https://spotify-discord-stats.your-name.workers.dev/admin`。
 2. 在 **ADMIN_TOKEN** 欄位貼上管理密碼，按 **登入**。
+
+   <img src="docs/images/admin-login.png" alt="admin 登入頁" width="340">
 3. 按 **Spotify 重新授權**。Spotify 會詢問是否允許讀取你最近播放的歌曲，按 **Agree**。
    看到 **Spotify authorization complete** 就完成了。
 
@@ -205,13 +221,18 @@ npm install
 2. 打開 [docs/discord-widget-config.json](docs/discord-widget-config.json)，
    把內容全部複製起來（在 GitHub 上可以按 **Copy raw file** 按鈕）。在 widget 編輯器右上角按
    **⋮**，選 **Paste config from clipboard**。所有欄位會一次設定好，名稱也都對。
+
+   <img src="docs/images/widget-menu.png" alt="widget 編輯器選單裡的 Paste config from clipboard" width="360">
 3. widget 上有三張圖。到 **Games** → **Assets** 上傳你自己的圖片，分別命名為
    `widget_hero`（widget 上的大圖）、`widget_preview` 和 `widget_mini`，
    或是在編輯器裡改選別的圖。
 4. 按 **Save changes**。不需要發佈：你是 app 的擁有者，可以直接把還沒發佈的 widget
    加到自己的個人檔案。
-5. 在 Discord 打開你的完整個人檔案，按 **Add Widget**，在 **Game Widgets**
-   找到你的 app，按 **Add to profile**。
+5. 在 Discord 打開你的完整個人檔案，按 **Add Widget**，選 **Game Stats**，
+   找到你的 app，按 **Add to profile**。如果 Discord 要你連結帳號，按
+   **Link your account** 並同意授權。
+
+   <img src="docs/images/discord-add-widget.png" alt="Add Profile Widget 視窗的 Game Stats 清單" width="520">
 
 <img src="docs/images/widget-editor.png" alt="貼上 config 後的 widget 編輯器" width="720">
 
@@ -221,6 +242,8 @@ npm install
 
 1. 在 admin 頁按 **立即同步**。按鈕下方會顯示 **抓到 N 筆、新增 N 筆**，以及 widget
    有沒有更新。重新整理頁面就能看到最新的預覽。
+
+   <img src="docs/images/admin-sync.png" alt="admin 頁的同步結果" width="380">
 2. 你的個人檔案 widget 現在會顯示統計。如果沒變，重新整理 Discord（`Ctrl+R`，
    macOS 是 `Cmd+R`）。
 3. 按 **發送週報**，按確定。幾秒內你應該會收到 bot 寄來的週報私訊。
@@ -235,6 +258,11 @@ admin 頁可以設定統計區間（7、28、90、365 天、自訂天數或全�
 
 ![admin 頁（假資料）](docs/images/admin.png)
 
+每個統計格可以選統計項目和自己的區間，預覽會跟著即時更新。下圖把第 3 格改成全部歷史裡最常聽的歌手：
+
+<img src="docs/images/admin-slots.png" alt="統計格編輯器" width="560">
+<img src="docs/images/admin-preview.png" alt="widget 即時預覽" width="300">
+
 所有設定和統計項目都列在 [docs/admin-page.md](docs/admin-page.md)（英文）。
 
 ## 設定完之後
@@ -248,7 +276,11 @@ admin 頁可以設定統計區間（7、28、90、365 天、自訂天數或全�
 - Spotify 的連結預設大約維持 180 天。到期前 30 天起，bot 每天會私訊提醒你一次，
   附上重新連結的連結。如果同步在那之前就開始失敗，到 admin 頁按 **Spotify 重新授權**。
 
-<img src="docs/images/recap.png" alt="週報私訊" width="480">
+每份回顧由幾張私訊卡片組成：總計和跟上一期的比較、排行榜、專輯封面和聽歌習慣，以及這段期間的新歌和新歌手。
+
+<img src="docs/images/recap-monthly.png" alt="月報的總覽卡片" width="480">
+<img src="docs/images/recap.png" alt="週報的排行榜" width="400">
+<img src="docs/images/recap-patterns.jpg" alt="回顧裡的專輯封面和聽歌習慣" width="400">
 
 不想收回顧的話，在 admin 頁取消勾選 **自動發送週報 / 月報 DM**，再按 **只儲存**。
 
@@ -289,7 +321,7 @@ Spotify 後台的 Redirect URI 和 `wrangler.toml` 裡的 `SPOTIFY_REDIRECT_URI`
 <summary><b>同步失敗，出現 <code>Active premium subscription required</code> 或 Spotify 的 403 錯誤</b></summary>
 
 建立 Spotify app 的那個帳號必須有有效的 Premium 訂閱。如果你連結的是另一個 Spotify 帳號，
-要先在 Spotify app 設定的 **Users Management** 把它加進去。
+要先在 Spotify app 設定的 **User Management** 把它加進去。
 </details>
 
 <details>
@@ -297,6 +329,10 @@ Spotify 後台的 Redirect URI 和 `wrangler.toml` 裡的 `SPOTIFY_REDIRECT_URI`
 
 - 確認 widget 已經加到你的個人檔案（第 7 步），而且 `DISCORD_CLIENT_ID` 是擁有這個 widget
   的 app 的 Application ID。
+- 同步後 admin 頁會用黃字顯示失敗原因；聽歌紀錄照樣會存，回顧也照常寄出。
+
+  <img src="docs/images/admin-sync-warn.png" alt="widget 推送失敗的警告" width="380">
+
 - 如果你的 app 沒有 widget 編輯器，目前就無法使用 widget（見最上面的警告）。
   不想讓 Worker 一直嘗試的話，把 `config/app.json` 裡的 `"patchDiscordOnSync"` 改成 `false`，
   再部署一次。

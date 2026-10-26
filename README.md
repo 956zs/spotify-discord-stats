@@ -9,6 +9,7 @@ weekly and a monthly recap by Discord DM. It runs for free on Cloudflare, with
 no server of your own.
 
 <img src="docs/images/widget.png" alt="Profile widget showing four weeks of Spotify stats" width="480">
+<img src="docs/images/widget-mini.png" alt="The same widget on the mini profile" width="300">
 
 - **Profile widget:** last played song, plus six stats such as songs played,
   listening time, different artists, or top album, over 4 weeks or any range.
@@ -102,12 +103,21 @@ The profile widget belongs to this app, and its bot sends you the recap DMs.
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
    and click **New Application**. Its name is shown on the widget, for example
    `My Spotify Stats`.
+
+   <img src="docs/images/portal-new-app.png" alt="Create a new app dialog" width="380">
+
 2. On the **General Information** page, copy the **Application ID**.
+
+   <img src="docs/images/portal-app-id.png" alt="Application ID with a Copy button" width="380">
 3. Open the **Bot** page, click **Reset Token**, and copy the token. Discord
    shows it only once. Treat it like a password.
+
+   <img src="docs/images/portal-bot-token.png" alt="Reset Token button on the Bot page" width="520">
 4. Add the bot to your server: open **OAuth2** → **URL Generator** and tick
    the `bot` scope. No permissions are needed. Open the generated link at the
    bottom, pick your server, then click **Continue** and **Authorize**.
+
+   <img src="docs/images/portal-oauth2.png" alt="OAuth2 URL Generator with the bot scope ticked" width="640">
 5. Get your own user ID: in Discord, open **User Settings** (the gear icon) →
    **Advanced** and turn on **Developer Mode**. Then right-click your name
    anywhere and choose **Copy User ID**.
@@ -168,13 +178,17 @@ The profile widget belongs to this app, and its bot sends you the recap DMs.
      example `https://spotify-discord-stats.your-name.workers.dev/spotify/callback`.
      Click **Add**.
    - When asked which APIs you plan to use, tick **Web API**.
+
+   <img src="docs/images/spotify-create.png" alt="Spotify Create app form filled in" width="640">
 3. Accept the terms and click **Save**.
 4. Open the app's **Settings**. Copy the **Client ID**, then click
    **View client secret** and copy the **Client Secret**.
 
+   <img src="docs/images/spotify-settings.png" alt="Spotify app settings with the Client ID and View client secret" width="640">
+
 > [!NOTE]
 > Connect Spotify in Step 6 with the same account that owns this app. To use a
-> different Spotify account, add it under **Settings** → **Users Management**
+> different Spotify account, add it under **Settings** → **User Management**
 > first.
 
 ### Step 5: Fill in your settings
@@ -220,6 +234,8 @@ The profile widget belongs to this app, and its bot sends you the recap DMs.
 2. Paste your admin password into the **ADMIN_TOKEN** box and click **登入**
    (Sign in). The admin page is in Chinese; the buttons you need are named
    below.
+
+   <img src="docs/images/admin-login.png" alt="Admin sign-in page" width="340">
 3. Click **Spotify 重新授權** (Connect Spotify). Spotify asks for permission to
    read your recently played songs. Click **Agree**. You should see
    **Spotify authorization complete**.
@@ -238,13 +254,18 @@ The profile widget belongs to this app, and its bot sends you the recap DMs.
    editor, click the **⋮** button at the top right and choose
    **Paste config from clipboard**. This sets up every field with the right
    name.
+
+   <img src="docs/images/widget-menu.png" alt="Widget editor menu with Paste config from clipboard" width="360">
 3. The widget shows three pictures. Upload your own images under **Games** →
    **Assets** with the names `widget_hero` (the big picture on the widget),
    `widget_preview`, and `widget_mini`, or pick other images in the editor.
 4. Click **Save changes**. You don't need to publish: as the app's owner you
    can add an unpublished widget to your own profile.
-5. In Discord, open your full profile and click **Add Widget**. Under
-   **Game Widgets**, find your app and click **Add to profile**.
+5. In Discord, open your full profile and click **Add Widget**. Choose
+   **Game Stats**, find your app, and click **Add to profile**. If Discord asks
+   you to link your account, click **Link your account** and allow it.
+
+   <img src="docs/images/discord-add-widget.png" alt="Add Profile Widget dialog with the Game Stats list" width="520">
 
 <img src="docs/images/widget-editor.png" alt="Widget editor after pasting the config" width="720">
 
@@ -255,6 +276,8 @@ Field names and details: [docs/discord-widget.md](docs/discord-widget.md).
 1. On the admin page, click **立即同步** (Sync now). The line under the buttons
    shows **抓到 N 筆、新增 N 筆** (fetched N, added N) and whether the widget
    was updated. Reload the page to refresh the preview.
+
+   <img src="docs/images/admin-sync.png" alt="Sync result on the admin page" width="380">
 2. Your profile widget now shows your stats. If it does not change, reload
    Discord (`Ctrl+R`, or `Cmd+R` on macOS).
 3. Click **發送週報** (Send weekly recap) and confirm. A recap DM from your bot
@@ -270,6 +293,12 @@ a live preview. Changes apply at the next sync, or right away with
 **儲存並推送到 Discord** (Save and push to Discord).
 
 ![Admin page with sample data](docs/images/admin.png)
+
+Each slot picks a stat and its own range; the preview updates as you change
+them. Here slot 3 shows the top artist of all time:
+
+<img src="docs/images/admin-slots.png" alt="Stat slot editor" width="560">
+<img src="docs/images/admin-preview.png" alt="Live preview of the widget" width="300">
 
 Every setting and stat is listed in [docs/admin-page.md](docs/admin-page.md).
 
@@ -289,7 +318,12 @@ Every setting and stat is listed in [docs/admin-page.md](docs/admin-page.md).
   syncing starts failing earlier, reconnect with **Spotify 重新授權** on the
   admin page.
 
-<img src="docs/images/recap.png" alt="Weekly recap DM" width="480">
+Each recap is a few DM cards: totals and comparison with the previous period,
+rankings, album covers with listening patterns, and new songs and artists.
+
+<img src="docs/images/recap-monthly.png" alt="Monthly recap summary card" width="480">
+<img src="docs/images/recap.png" alt="Weekly recap rankings" width="400">
+<img src="docs/images/recap-patterns.jpg" alt="Recap album covers and listening pattern" width="400">
 
 Recaps can be turned off on the admin page: untick **自動發送週報 / 月報 DM**
 (send recap DMs), then click **只儲存** (Save only).
@@ -335,7 +369,7 @@ slash. Fix whichever one is wrong, then run `npm run cf:deploy` if you changed
 <summary><b>Sync fails with <code>Active premium subscription required</code> or a 403 error from Spotify</b></summary>
 
 The Spotify account that owns the app needs an active Premium subscription. If
-you connected a different Spotify account, add it under **Users Management**
+you connected a different Spotify account, add it under **User Management**
 in the Spotify app settings.
 </details>
 
@@ -344,6 +378,11 @@ in the Spotify app settings.
 
 - Check that the widget is on your profile (Step 7) and that
   `DISCORD_CLIENT_ID` is the Application ID of the app that owns the widget.
+- The admin page shows the reason as a yellow warning after a sync; plays
+  are still saved and recaps still go out.
+
+  <img src="docs/images/admin-sync-warn.png" alt="Widget push failure warning" width="380">
+
 - If your app has no widget editor, you can't have a widget right now (see
   the warning at the top). To stop the Worker from trying, set
   `"patchDiscordOnSync": false` in `config/app.json` and deploy again.
