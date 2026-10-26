@@ -205,10 +205,11 @@ npm install
 
 1. 打開你的 Worker 網址加上 `/admin`，例如
    `https://spotify-discord-stats.your-name.workers.dev/admin`。
-2. 在 **ADMIN_TOKEN** 欄位貼上管理密碼，按 **登入**。
+2. 在 **ADMIN_TOKEN** 欄位貼上管理密碼，按 **登入**。頁面會跟著瀏覽器的語言顯示，
+   右上角的 **中文 / EN** 可以切換。
 
-   <img src="docs/images/admin-login.png" alt="admin 登入頁" width="340">
-3. 按 **Spotify 重新授權**。Spotify 會詢問是否允許讀取你最近播放的歌曲，按 **Agree**。
+   <img src="docs/images/admin-login-zh.png" alt="admin 登入頁" width="340">
+3. 打開 **狀態** 分頁，按 **Spotify 重新授權**。Spotify 會詢問是否允許讀取你最近播放的歌曲，按 **Agree**。
    看到 **Spotify authorization complete** 就完成了。
 
 ### 第 7 步：設定個人檔案 widget
@@ -247,34 +248,34 @@ npm install
 
 ### 第 8 步：確認有在運作
 
-1. 在 admin 頁按 **立即同步**。按鈕下方會顯示 **抓到 N 筆、新增 N 筆**，以及 widget
-   有沒有更新。重新整理頁面就能看到最新的預覽。
+1. 在 admin 頁的 **狀態** 分頁按 **立即同步**。**上次操作結果** 底下會顯示
+   **抓到 N 筆、新增 N 筆**，以及 widget 有沒有更新。重新整理頁面就能看到最新的預覽。
 
-   <img src="docs/images/admin-sync.png" alt="admin 頁的同步結果" width="380">
+   <img src="docs/images/admin-sync-zh.png" alt="admin 頁的同步結果" width="440">
 2. 你的個人檔案 widget 現在會顯示統計。如果沒變，重新整理 Discord（`Ctrl+R`，
    macOS 是 `Cmd+R`）。
-3. 按 **發送週報**，按確定。幾秒內你應該會收到 bot 寄來的週報私訊。
+3. 在 **週報月報** 分頁按 **發送週報**，按確定。幾秒內你應該會收到 bot 寄來的週報私訊。
 
 大功告成。終端機可以關掉了，之後全部在 Cloudflare 上自動執行。
 
 ## 選擇 widget 要顯示什麼
 
-admin 頁可以設定統計區間（7、28、90、365 天、自訂天數或全部時間）、widget 文字，
-以及六個統計格各自顯示什麼，旁邊有即時預覽。改完會在下次同步時套用，或按
+admin 頁的 **Widget** 分頁可以設定統計區間（7、28、90、365 天、自訂天數或全部時間）、widget 文字，
+以及六個統計格各自顯示什麼，右邊有即時預覽。改完會在下次同步時套用，或按頁面最下面的
 **儲存並推送到 Discord** 立刻更新。
 
-![admin 頁（假資料）](docs/images/admin.png)
+![admin 頁（假資料）](docs/images/admin-zh.png)
 
 每個統計格可以選統計項目和自己的區間，預覽會跟著即時更新。下圖把第 3 格改成全部歷史裡最常聽的歌手：
 
-<img src="docs/images/admin-slots.png" alt="統計格編輯器" width="560">
-<img src="docs/images/admin-preview.png" alt="widget 即時預覽" width="300">
+<img src="docs/images/admin-slots-zh.png" alt="統計格編輯器" width="700">
+<img src="docs/images/admin-preview-zh.png" alt="widget 即時預覽" width="330">
 
-widget 最上面的大圖可以在 **Widget 大圖** 選：固定素材（`widget_hero`，預設）、
+widget 最上面的大圖可以在 **大圖** 分頁選：固定素材（`widget_hero`，預設）、
 在 admin 頁上傳的圖片，或最近播放那首歌的專輯封面。如果你的 widget 是在這個選項出現之前做的，
 要到 widget 編輯器把大圖改成 User Data `hero_image`，Fallback 選 `widget_hero`，
 或重新貼一次 [設定檔](docs/discord-widget-config.json)。Discord 可能會快取舊圖一陣子。
-上傳時頁面會開一個裁切工具，把圖裁成剛好 1300×1200，並用參考線標出哪裡會淡出、哪裡會被文字蓋到。
+按 **選擇圖片並裁切** 會開一個裁切工具，把圖裁成剛好 1300×1200，並用參考線標出哪裡會淡出、哪裡會被文字蓋到。
 
 所有設定和統計項目都列在 [docs/admin-page.md](docs/admin-page.md)（英文）。
 
@@ -287,7 +288,7 @@ widget 最上面的大圖可以在 **Widget 大圖** 選：固定素材（`widge
 - **月報**：每月 1 號 09:00，涵蓋上一個月。
 - 寄送時間以台灣時間（UTC+8）計算，目前還不能改時區。
 - Spotify 的連結預設大約維持 180 天。到期前 30 天起，bot 每天會私訊提醒你一次，
-  附上重新連結的連結。如果同步在那之前就開始失敗，到 admin 頁按 **Spotify 重新授權**。
+  附上重新連結的連結。如果同步在那之前就開始失敗，到 admin 頁的 **狀態** 分頁按 **Spotify 重新授權**。
 
 每份回顧由幾張私訊卡片組成：總計和跟上一期的比較、排行榜、專輯封面和聽歌習慣，以及這段期間的新歌和新歌手。
 
@@ -295,7 +296,7 @@ widget 最上面的大圖可以在 **Widget 大圖** 選：固定素材（`widge
 <img src="docs/images/recap.png" alt="週報的排行榜" width="400">
 <img src="docs/images/recap-patterns.jpg" alt="回顧裡的專輯封面和聽歌習慣" width="400">
 
-不想收回顧的話，在 admin 頁取消勾選 **自動發送週報 / 月報 DM**，再按 **只儲存**。
+不想收回顧的話，在 admin 頁的 **週報月報** 分頁關掉 **自動發送週報 / 月報 DM**，再按 **只儲存**。
 
 ## 匯入完整的 Spotify 歷史（選用）
 
@@ -314,7 +315,7 @@ Spotify 可以把你所有的播放紀錄寄給你：
    npm run cf:import -- --remote "/路徑/Spotify Extended Streaming History"
    ```
 
-4. 回到 admin 頁按 **立即同步**，更新統計數字。
+4. 回到 admin 頁的 **狀態** 分頁按 **立即同步**，更新統計數字。
 
 匯入會略過你第一首同步歌曲之後的所有紀錄，所以 Worker 已經存過的歌不會重複計算；
 同一份資料再匯入一次也不會多加。比較短的「Account data」匯出檔也能用，只是細節比較少。
@@ -437,9 +438,9 @@ Spotify 後台的 Redirect URI 和 `wrangler.toml` 裡的 `SPOTIFY_REDIRECT_URI`
 
 - 確認 widget 已經加到你的個人檔案（第 7 步），而且 `DISCORD_CLIENT_ID` 是擁有這個 widget
   的 app 的 Application ID。
-- 同步後 admin 頁會用黃字顯示失敗原因；聽歌紀錄照樣會存，回顧也照常寄出。
+- 同步後 admin 頁的 **狀態** 分頁會在 **上次操作結果** 用黃字顯示失敗原因；聽歌紀錄照樣會存，回顧也照常寄出。
 
-  <img src="docs/images/admin-sync-warn.png" alt="widget 推送失敗的警告" width="380">
+  <img src="docs/images/admin-sync-warn-zh.png" alt="widget 推送失敗的警告" width="440">
 
 - 如果你的 app 沒有 widget 編輯器，目前就無法使用 widget（見最上面的警告）。
   不想讓 Worker 一直嘗試的話，把 `config/app.json` 裡的 `"patchDiscordOnSync"` 改成 `false`，
@@ -522,7 +523,6 @@ Node/SQLite 的指令（`npm run spotify:auth-url`、`spotify:token`、`spotify:
 
 已知限制：
 
-- admin 頁介面只有繁體中文。
 - 週報、月報的排程固定用 `Asia/Taipei`。
 - Spotify 的 Recently Played API 只給歌曲長度，不是實際聽了多久，所以同步來的聽歌時間是估計值。
   匯入的歷史紀錄才有精確的播放時間。

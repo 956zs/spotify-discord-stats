@@ -73,8 +73,8 @@ both the stat's Value and its Label to Value Type `User Data`:
 | #6 | `Top_Album` | `Top_Album_Label` |
 
 `hero_image` is an image field, not text. The Worker sends it as a media field
-(type 3, `{ "url": "https://..." }`) only when the admin page's **Widget 大圖**
-setting is "custom upload" or "last played album cover" and an image is
+(type 3, `{ "url": "https://..." }`) only when the admin page's **Hero image**
+tab is set to **Custom upload** or **Last played album cover** and an image is
 available. Otherwise it sends nothing and Discord shows the `widget_hero`
 fallback. Widgets made from an older copy of the config have `widget_hero` as a
 plain Application Asset; switch the hero image to User Data `hero_image` with

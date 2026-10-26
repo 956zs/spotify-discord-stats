@@ -233,14 +233,14 @@ The profile widget belongs to this app, and its bot sends you the recap DMs.
 
 1. Open your Worker URL followed by `/admin`, for example
    `https://spotify-discord-stats.your-name.workers.dev/admin`.
-2. Paste your admin password into the **ADMIN_TOKEN** box and click **登入**
-   (Sign in). The admin page is in Chinese; the buttons you need are named
-   below.
+2. Paste your admin password into the **ADMIN_TOKEN** box and click
+   **Sign in**. The page follows your browser's language; use the **中文 / EN**
+   switch in the header to change it.
 
    <img src="docs/images/admin-login.png" alt="Admin sign-in page" width="340">
-3. Click **Spotify 重新授權** (Connect Spotify). Spotify asks for permission to
-   read your recently played songs. Click **Agree**. You should see
-   **Spotify authorization complete**.
+3. Open the **Status** tab and click **Reconnect Spotify**. Spotify asks for
+   permission to read your recently played songs. Click **Agree**. You should
+   see **Spotify authorization complete**.
 
 ### Step 7: Set up the profile widget
 
@@ -285,41 +285,41 @@ Field names and details: [docs/discord-widget.md](docs/discord-widget.md).
 
 ### Step 8: Check that it works
 
-1. On the admin page, click **立即同步** (Sync now). The line under the buttons
-   shows **抓到 N 筆、新增 N 筆** (fetched N, added N) and whether the widget
-   was updated. Reload the page to refresh the preview.
+1. On the admin page's **Status** tab, click **Sync now**. Under
+   **Last action result** you see **Fetched N plays, added N new** and whether
+   the widget was updated. Reload the page to refresh the preview.
 
-   <img src="docs/images/admin-sync.png" alt="Sync result on the admin page" width="380">
+   <img src="docs/images/admin-sync.png" alt="Sync result on the admin page" width="440">
 2. Your profile widget now shows your stats. If it does not change, reload
    Discord (`Ctrl+R`, or `Cmd+R` on macOS).
-3. Click **發送週報** (Send weekly recap) and confirm. A recap DM from your bot
-   arrives within a few seconds.
+3. On the **Recaps** tab, click **Send weekly** and confirm. A recap DM from
+   your bot arrives within a few seconds.
 
 Done. You can close the terminal; everything now runs on Cloudflare.
 
 ## Choosing what the widget shows
 
-The admin page sets the stats range (7, 28, 90, 365 days, any number of days,
-or all time), the widget text, and what each of the six stat slots shows, with
-a live preview. Changes apply at the next sync, or right away with
-**儲存並推送到 Discord** (Save and push to Discord).
+The admin page's **Widget** tab sets the stats range (7, 28, 90, 365 days, any
+number of days, or all time), the widget text, and what each of the six stat
+slots shows, with a live preview on the right. Changes apply at the next sync,
+or right away with **Save & push to Discord** at the bottom of the page.
 
 ![Admin page with sample data](docs/images/admin.png)
 
 Each slot picks a stat and its own range; the preview updates as you change
 them. Here slot 3 shows the top artist of all time:
 
-<img src="docs/images/admin-slots.png" alt="Stat slot editor" width="560">
-<img src="docs/images/admin-preview.png" alt="Live preview of the widget" width="300">
+<img src="docs/images/admin-slots.png" alt="Stat slot editor" width="700">
+<img src="docs/images/admin-preview.png" alt="Live preview of the widget" width="330">
 
 The big image at the top of the widget can be a fixed picture (the
 `widget_hero` asset, the default), an image you upload on the admin page, or
-the album cover of the song you played last. Pick one under **Widget 大圖**.
+the album cover of the song you played last. Pick one on the **Hero image** tab.
 If you set up your widget before this option existed, open the widget editor
 and change the hero image to User Data `hero_image` with `widget_hero` as the
 Fallback, or paste [the config](docs/discord-widget-config.json) again.
 Discord may keep showing the old picture for a while.
-When you upload, the page opens a crop tool that cuts your picture to exactly
+**Choose & crop an image** opens a crop tool that cuts your picture to exactly
 1300×1200, with guides showing which parts fade out or sit under the text.
 
 Every setting and stat is listed in [docs/admin-page.md](docs/admin-page.md).
@@ -337,8 +337,8 @@ Every setting and stat is listed in [docs/admin-page.md](docs/admin-page.md).
 - Recap times use Taiwan time (UTC+8). The time zone is not configurable yet.
 - Spotify connections are assumed to last about 180 days. From 30 days before
   that, the bot DMs you a reminder once a day with a link to reconnect. If
-  syncing starts failing earlier, reconnect with **Spotify 重新授權** on the
-  admin page.
+  syncing starts failing earlier, reconnect with **Reconnect Spotify** on the
+  admin page's **Status** tab.
 
 Each recap is a few DM cards: totals and comparison with the previous period,
 rankings, album covers with listening patterns, and new songs and artists.
@@ -347,8 +347,8 @@ rankings, album covers with listening patterns, and new songs and artists.
 <img src="docs/images/recap.png" alt="Weekly recap rankings" width="400">
 <img src="docs/images/recap-patterns.jpg" alt="Recap album covers and listening pattern" width="400">
 
-Recaps can be turned off on the admin page: untick **自動發送週報 / 月報 DM**
-(send recap DMs), then click **只儲存** (Save only).
+Recaps can be turned off on the admin page: on the **Recaps** tab, switch off
+**Send weekly / monthly recap DMs automatically**, then click **Save only**.
 
 ## Import your full Spotify history (optional)
 
@@ -368,7 +368,8 @@ Spotify can send you everything you have ever played:
    npm run cf:import -- --remote "/path/to/Spotify Extended Streaming History"
    ```
 
-4. On the admin page, click **立即同步** (Sync now) to refresh the numbers.
+4. On the admin page's **Status** tab, click **Sync now** to refresh the
+   numbers.
 
 The import skips everything played after your first synced song, so plays
 already saved by the Worker are not counted twice, and running the same import
@@ -511,10 +512,11 @@ in the Spotify app settings.
 
 - Check that the widget is on your profile (Step 7) and that
   `DISCORD_CLIENT_ID` is the Application ID of the app that owns the widget.
-- The admin page shows the reason as a yellow warning after a sync; plays
-  are still saved and recaps still go out.
+- After a sync, the admin page shows the reason as a yellow warning under
+  **Last action result** on the **Status** tab; plays are still saved and
+  recaps still go out.
 
-  <img src="docs/images/admin-sync-warn.png" alt="Widget push failure warning" width="380">
+  <img src="docs/images/admin-sync-warn.png" alt="Widget push failure warning" width="440">
 
 - If your app has no widget editor, you can't have a widget right now (see
   the warning at the top). To stop the Worker from trying, set
@@ -534,7 +536,7 @@ in the Spotify app settings.
 </details>
 
 <details>
-<summary><b>The admin page rejects my password (<code>Token 不正確</code>)</b></summary>
+<summary><b>The admin page rejects my password (<code>Wrong token</code>)</b></summary>
 
 The password does not match `ADMIN_TOKEN`. If you lost it, set a new one with
 `npx wrangler secret put ADMIN_TOKEN`.
@@ -603,7 +605,6 @@ get started.
 
 Known limitations:
 
-- The admin page interface is in Traditional Chinese.
 - Recap schedules use `Asia/Taipei`.
 - Spotify's Recently Played API returns track length, not time actually
   listened, so listening time from synced plays is an estimate. Imported
