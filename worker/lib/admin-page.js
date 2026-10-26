@@ -554,7 +554,11 @@ async function save(push) {
         return;
       }
       showActionResult(result, syncSummary(result));
-      setStatus('saveStatus', result.discord?.patched ? '✓ 已儲存並推送到 Discord' : '✓ 已儲存（' + syncSummary(result) + '）', 'ok');
+      setStatus(
+        'saveStatus',
+        result.discord?.patched ? '✓ 已儲存並推送到 Discord' : '✓ 已儲存（' + syncSummary(result) + '）',
+        result.discord?.error ? 'warn' : 'ok'
+      );
       await loadState();
     } else {
       setStatus('saveStatus', '✓ 已儲存，下次同步（10 分鐘內）會套用', 'ok');
@@ -580,7 +584,11 @@ function renderStatus(status) {
 function syncSummary(result) {
   const plays = result.recentlyPlayed;
   const fetched = plays ? '抓到 ' + plays.fetched + ' 筆、新增 ' + plays.inserted + ' 筆' : '';
-  const discord = result.discord?.patched ? 'Discord 已更新' : 'Discord 未更新：' + (result.discord?.reason || 'unknown');
+  const discord = result.discord?.patched
+    ? 'Discord 已更新'
+    : result.discord?.error
+      ? 'widget 推送失敗：' + result.discord.error
+      : 'Discord 未更新：' + (result.discord?.reason || 'unknown');
   return [fetched, discord].filter(Boolean).join('；');
 }
 
@@ -589,7 +597,7 @@ function recapSummary(result) {
 }
 
 function showActionResult(result, summary) {
-  setStatus('actionStatus', summary, 'ok');
+  setStatus('actionStatus', summary, result.discord?.error ? 'warn' : 'ok');
   $('actionJson').textContent = JSON.stringify(result, null, 2);
   $('actionDetails').classList.remove('gone');
 }

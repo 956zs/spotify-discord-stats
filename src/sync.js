@@ -10,7 +10,12 @@ export async function syncOnce(options = {}) {
 
   let discord = { patched: false, skipped: true, reason: 'disabled' };
   if (options.patchDiscord ?? appConfig.patchDiscordOnSync) {
-    discord = await patchDiscordWidget(widget, { force: options.forcePatch });
+    try {
+      discord = await patchDiscordWidget(widget, { force: options.forcePatch });
+    } catch (error) {
+      console.warn('Discord widget update failed', error.message);
+      discord = { patched: false, skipped: false, reason: 'error', error: error.message };
+    }
   }
 
   const result = { recentlyPlayed, genres, widget: widget.data.dynamic, discord };

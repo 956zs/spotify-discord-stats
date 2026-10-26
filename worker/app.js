@@ -85,7 +85,7 @@ export async function handleRequest(request, env) {
 }
 
 export async function handleScheduled(env, now = new Date()) {
-  // A failed sync (Spotify or widget PATCH) must not skip the reminder and recaps;
+  // A failed sync (e.g. Spotify is down or needs reauthorizing) must not skip the reminder and recaps;
   // it is rethrown at the end so the cron run still shows as failed.
   let syncError = null;
   try {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { handleScheduled } from '../worker/app.js';
+import { syncOnce } from '../worker/lib/sync.js';
 import { createD1, insertPlay } from './helpers/d1.js';
 
 // Monday 09:00 Asia/Taipei, when the weekly recap is due.
@@ -62,8 +63,18 @@ test('scheduled run syncs, patches the widget, and sends the due recap', async (
 
 test('a failed widget patch does not block the due recap', async (t) => {
   const dms = mockFetch(t, { widgetStatus: 404 });
-  await assert.rejects(handleScheduled(createEnv(), WEEKLY_RECAP_DUE), /Discord widget PATCH failed 404/);
+  t.mock.method(console, 'warn', () => {});
+  await handleScheduled(createEnv(), WEEKLY_RECAP_DUE);
   assert.ok(weeklyRecapSent(dms));
+});
+
+test('a failed widget patch is reported in the sync result instead of thrown', async (t) => {
+  mockFetch(t, { widgetStatus: 404 });
+  t.mock.method(console, 'warn', () => {});
+  const result = await syncOnce(createEnv(), { forcePatch: true });
+  assert.equal(result.recentlyPlayed.fetched, 0);
+  assert.equal(result.discord.patched, false);
+  assert.match(result.discord.error, /Discord widget PATCH failed 404/);
 });
 
 test('a failed Spotify sync does not block the due recap', async (t) => {
