@@ -3,7 +3,9 @@ import { MS_PER_DAY, MS_PER_MINUTE, formatMinutes } from './time.js';
 
 // Every metric a widget slot can show. `queries` names the result sets it reads (see
 // widget-metrics-query.js) so a sync only runs the queries the chosen slots need.
-// `name` and `group` are admin-page copy; `label` is the default widget label.
+// `name` and `group` are zh-TW admin-page copy (English in METRIC_NAMES_EN and
+// GROUP_NAMES_EN); `label` is the default widget label and is never translated
+// (Discord shows it).
 
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 const SECONDS_PER_MINUTE = 60;
@@ -12,6 +14,49 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 const EMPTY = '—';
 
 export const METRIC_GROUPS = ['數量', '時間', '排行', '習慣', '探索', '連續紀錄', '里程碑'];
+
+// ---- English admin-page copy (metric dropdown in the admin page's slot rows) ----
+// zh-TW names live in METRICS below; these are the English names for the same ids.
+export const GROUP_NAMES_EN = {
+  數量: 'Counts',
+  時間: 'Time',
+  排行: 'Top lists',
+  習慣: 'Habits',
+  探索: 'Discovery',
+  連續紀錄: 'Streaks',
+  里程碑: 'Milestones'
+};
+
+export const METRIC_NAMES_EN = {
+  songsPlayed: 'Play count',
+  uniqueSongs: 'Unique songs',
+  differentArtists: 'Different artists',
+  differentAlbums: 'Different albums',
+  listeningMinutes: 'Listening time (minutes)',
+  listeningHours: 'Listening time (hours)',
+  dailyMinutes: 'Average daily listening time',
+  dailyPlays: 'Average daily plays',
+  averageTrackLength: 'Average track length',
+  topTrack: 'Top song',
+  topTrackWithArtist: 'Top song (with artist)',
+  topTrackPlays: 'Top song plays',
+  topArtist: 'Top artist',
+  topArtistPlays: 'Top artist plays',
+  topAlbum: 'Top album',
+  topAlbumPlays: 'Top album plays',
+  peakHour: 'Peak listening hour',
+  peakWeekday: 'Peak listening weekday',
+  listeningDays: 'Days with listening',
+  busiestDay: 'Busiest day (date and plays)',
+  busiestDayPlays: 'Most plays in a day',
+  lateNightShare: 'Late-night share (00–05)',
+  newSongs: 'New songs (first play)',
+  newArtists: 'New artists (first play)',
+  repeatRate: 'Repeat rate',
+  currentStreak: 'Current listening streak',
+  longestStreak: 'Longest listening streak',
+  daysSinceFirstPlay: 'Days since first play (ignores range)'
+};
 
 export const METRICS = {
   songsPlayed: {
@@ -138,12 +183,14 @@ export function metricQueries(id) {
   return METRICS[id].queries;
 }
 
-// Admin-page copy for the slot dropdowns, in display order.
+// Admin-page copy for the slot dropdowns, in display order, in zh-TW and English.
 export function metricCatalog() {
   return Object.entries(METRICS).map(([id, metric]) => ({
     id,
     group: metric.group,
+    groupEn: GROUP_NAMES_EN[metric.group],
     name: metric.name,
+    nameEn: METRIC_NAMES_EN[id],
     label: metric.label
   }));
 }

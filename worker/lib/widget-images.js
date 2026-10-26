@@ -1,5 +1,5 @@
 import { heroImagePathWithVersion } from '../../shared/widget-hero.js';
-import { HttpError } from './http.js';
+import { ERROR_CODES, HttpError } from './http.js';
 
 export const HERO_IMAGE_KEY = 'hero';
 
@@ -22,27 +22,27 @@ export function detectImageType(bytes) {
   return ALLOWED_TYPES.find((type) => SIGNATURES[type](bytes)) ?? null;
 }
 
-// Reads and checks an upload request. Throws HttpError with a zh-TW message the admin
-// page shows as is.
+// Reads and checks an upload request. Throws HttpError with a zh-TW message and a
+// `code` the admin page translates.
 export async function readImageUpload(request) {
   const contentType = (request.headers.get('Content-Type') ?? '').split(';')[0].trim().toLowerCase();
   if (!ALLOWED_TYPES.includes(contentType)) {
-    throw new HttpError('只接受 PNG、JPEG、WebP 或 GIF 圖片', 415);
+    throw new HttpError('只接受 PNG、JPEG、WebP 或 GIF 圖片', 415, ERROR_CODES.imageType);
   }
 
   const declaredLength = Number(request.headers.get('Content-Length'));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_WIDGET_IMAGE_BYTES) {
-    throw new HttpError(tooLargeMessage(), 413);
+    throw new HttpError(tooLargeMessage(), 413, ERROR_CODES.imageTooLarge);
   }
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (bytes.byteLength > MAX_WIDGET_IMAGE_BYTES) {
-    throw new HttpError(tooLargeMessage(), 413);
+    throw new HttpError(tooLargeMessage(), 413, ERROR_CODES.imageTooLarge);
   }
   if (bytes.byteLength === 0) {
-    throw new HttpError('圖片是空的', 400);
+    throw new HttpError('圖片是空的', 400, ERROR_CODES.imageEmpty);
   }
   if (detectImageType(bytes) !== contentType) {
-    throw new HttpError('檔案內容和圖片格式不符，請上傳真正的 PNG、JPEG、WebP 或 GIF', 400);
+    throw new HttpError('檔案內容和圖片格式不符，請上傳真正的 PNG、JPEG、WebP 或 GIF', 400, ERROR_CODES.imageMismatch);
   }
   return { contentType, bytes };
 }

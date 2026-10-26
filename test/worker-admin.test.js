@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { handleRequest } from '../worker/app.js';
+import worker from '../worker/index.js';
+import { adminStatus, handleRequest } from '../worker/app.js';
+import { LANGUAGES, MESSAGES } from '../worker/lib/admin/i18n.js';
 import { verifySession } from '../worker/lib/admin-auth.js';
+import { ERROR_CODES } from '../worker/lib/http.js';
 import { runDueRecapReports } from '../worker/lib/recap-delivery.js';
 import { getDefaultSettings, loadSettings, saveSettings } from '../worker/lib/settings.js';
 import { setState } from '../worker/lib/state.js';
@@ -305,4 +308,137 @@ test('logout clears the session cookie', async () => {
   const response = await handleRequest(request('/admin/logout', { method: 'POST' }), env);
   assert.equal(response.status, 303);
   assert.match(response.headers.get('Set-Cookie'), /Max-Age=0/);
+});
+
+test('admin errors carry a stable code, and the Worker sends it in the JSON body', async () => {
+  const env = createEnv();
+  await assert.rejects(handleRequest(request('/admin/api/state'), env), { status: 401, code: 'unauthorized' });
+
+  const cookie = await login(env);
+  const settings = getDefaultSettings();
+  await assert.rejects(
+    handleRequest(jsonPost('/admin/api/settings', { settings }, { Cookie: cookie, Origin: 'https://evil.example' }), env),
+    { status: 403, code: 'forbidden' }
+  );
+  await assert.rejects(
+    handleRequest(
+      request('/admin/api/settings', {
+        method: 'POST',
+        headers: { Cookie: cookie, 'Content-Type': 'text/plain', Origin: ORIGIN },
+        body: JSON.stringify({ settings })
+      }),
+      env
+    ),
+    { status: 415, code: 'expected_json' }
+  );
+  await assert.rejects(
+    handleRequest(
+      request('/admin/api/settings', {
+        method: 'POST',
+        headers: { Cookie: cookie, 'Content-Type': 'application/json', Origin: ORIGIN },
+        body: '{not json'
+      }),
+      env
+    ),
+    { status: 400, code: 'invalid_json' }
+  );
+  await assert.rejects(
+    handleRequest(request('/admin/recap/weekly/send', { headers: { Cookie: cookie } }), env),
+    { status: 405, code: 'method_not_allowed' }
+  );
+
+  // Invalid settings keep the readable message and list each problem in `details`.
+  const invalid = await worker.fetch(jsonPost('/admin/api/settings', { settings: { ...settings, statsDays: -5 } }, { Cookie: cookie }), env);
+  assert.equal(invalid.status, 400);
+  const body = await invalid.json();
+  assert.equal(body.code, 'invalid_settings');
+  assert.match(body.error, /^invalid settings: /);
+  assert.ok(Array.isArray(body.details) && body.details.length > 0);
+
+  const missing = await worker.fetch(jsonPost('/admin/api/nope', {}, { Cookie: cookie }), env);
+  assert.deepEqual(await missing.json(), { error: 'not found', code: 'not_found' });
+
+  // A sync without a Spotify connection is a coded upstream error, not a bare message.
+  const sync = await worker.fetch(jsonPost('/admin/api/push', {}, { Cookie: cookie }), { ...env, SPOTIFY_CLIENT_ID: 'id' });
+  const syncBody = await sync.json();
+  assert.equal(sync.status, 500);
+  assert.equal(syncBody.code, 'spotify_not_connected');
+  assert.match(syncBody.error, /Missing Spotify refresh token/);
+});
+
+test('every error code has a translation in both languages', () => {
+  for (const code of Object.values(ERROR_CODES)) {
+    for (const lang of LANGUAGES) {
+      assert.ok(MESSAGES[lang][`err.${code}`], `${lang} is missing err.${code}`);
+    }
+  }
+});
+
+test('admin status is structured raw data for the page to format', async () => {
+  const env = createEnv();
+  const cookie = await login(env);
+  const empty = await (await handleRequest(request('/admin/api/state', { headers: { Cookie: cookie } }), env)).json();
+  assert.deepEqual(empty.status, {
+    spotify: { authorizedAt: null, expiresAt: null, daysLeft: null, validDays: 180, remindDays: 30 },
+    discord: { lastPushedAt: null }
+  });
+  assert.deepEqual(empty.recapSchedule, { weeklyDay: 1, monthlyDay: 1, hour: 9, minute: 0, timeZone: 'Asia/Taipei' });
+
+  const now = Date.parse('2026-10-27T00:00:00.000Z');
+  await setState(env.DB, 'spotify_refresh_token_issued_at', '2026-10-17T00:00:00.000Z');
+  await setState(env.DB, 'discord_widget_last_patched_at', '2026-10-26T23:50:00.000Z');
+  assert.deepEqual(await adminStatus(env, now), {
+    spotify: {
+      authorizedAt: '2026-10-17T00:00:00.000Z',
+      expiresAt: '2027-04-15T00:00:00.000Z',
+      daysLeft: 170,
+      validDays: 180,
+      remindDays: 30
+    },
+    discord: { lastPushedAt: '2026-10-26T23:50:00.000Z' }
+  });
+
+  // An expired token gives negative days; an unreadable date keeps the raw value only.
+  assert.equal((await adminStatus(env, now + 200 * DAY_MS)).spotify.daysLeft, -30);
+  await setState(env.DB, 'spotify_refresh_token_issued_at', 'garbage');
+  const garbage = (await adminStatus(env, now)).spotify;
+  assert.equal(garbage.authorizedAt, 'garbage');
+  assert.equal(garbage.daysLeft, null);
+  assert.equal(garbage.expiresAt, null);
+});
+
+test('admin and login pages render in the browser language under a strict CSP', async () => {
+  const env = createEnv();
+  const zh = await handleRequest(request('/admin', { headers: { 'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8' } }), env);
+  const zhBody = await zh.text();
+  assert.match(zhBody, /<html lang="zh-TW">/);
+  assert.match(zhBody, />登入</);
+
+  const en = await handleRequest(request('/admin', { headers: { 'Accept-Language': 'en-US,en;q=0.9' } }), env);
+  assert.match(await en.text(), /<html lang="en">[\s\S]*>Sign in</);
+
+  const failed = await handleRequest(
+    request('/admin/login', {
+      method: 'POST',
+      headers: { Origin: ORIGIN, 'Accept-Language': 'en' },
+      body: new URLSearchParams({ token: 'nope' })
+    }),
+    env
+  );
+  assert.equal(failed.status, 401);
+  assert.match(await failed.text(), /data-i18n="login\.failed">Wrong token</);
+
+  const cookie = await login(env);
+  const page = await handleRequest(request('/admin', { headers: { Cookie: cookie, 'Accept-Language': 'zh-HK' } }), env);
+  const html = await page.text();
+  assert.match(html, /<html lang="zh-TW">/);
+  const csp = page.headers.get('Content-Security-Policy');
+  assert.match(csp, /default-src 'none'/);
+  assert.match(csp, /script-src 'nonce-[0-9a-f]{32}'/);
+  assert.doesNotMatch(csp, /unsafe-inline|unsafe-eval/);
+  const markup = html.replace(/<script nonce[\s\S]*<\/script>/, '');
+  assert.doesNotMatch(markup, /\sstyle="/, 'inline style attributes are blocked by the CSP');
+  assert.doesNotMatch(markup, /\son[a-z]+="/, 'no inline event handlers');
+  assert.equal(html.match(/<script nonce=/g).length, 1);
+  assert.doesNotMatch(html.match(/<script nonce[\s\S]*<\/script>/)[0].slice(8, -9), /<\/script/i);
 });

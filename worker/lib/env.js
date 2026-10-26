@@ -1,7 +1,9 @@
+import { ERROR_CODES, HttpError } from './http.js';
+
 export function requiredEnv(env, name) {
   const value = env[name];
   if (!value) {
-    throw new Error(`Missing required binding/secret: ${name}`);
+    throw new HttpError(`Missing required binding/secret: ${name}`, 500, ERROR_CODES.missingConfig, [name]);
   }
   return value;
 }

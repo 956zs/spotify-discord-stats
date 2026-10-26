@@ -84,15 +84,18 @@ test('hero upload rejects other types, mismatched bytes, empty and oversized fil
   const env = createEnv();
   const cookie = await login(env);
   const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>');
-  await assert.rejects(handleRequest(upload(svg, 'image/svg+xml', { Cookie: cookie }), env), { status: 415 });
-  await assert.rejects(handleRequest(upload(PNG, 'text/html', { Cookie: cookie }), env), { status: 415 });
-  await assert.rejects(handleRequest(upload(PNG, 'image/jpeg', { Cookie: cookie }), env), { status: 400, message: /格式不符/ });
-  await assert.rejects(handleRequest(upload(svg, 'image/png', { Cookie: cookie }), env), { status: 400 });
-  await assert.rejects(handleRequest(upload(new Uint8Array(), 'image/png', { Cookie: cookie }), env), { status: 400 });
+  await assert.rejects(handleRequest(upload(svg, 'image/svg+xml', { Cookie: cookie }), env), { status: 415, code: 'image_type' });
+  await assert.rejects(handleRequest(upload(PNG, 'text/html', { Cookie: cookie }), env), { status: 415, code: 'image_type' });
+  await assert.rejects(
+    handleRequest(upload(PNG, 'image/jpeg', { Cookie: cookie }), env),
+    { status: 400, code: 'image_mismatch', message: /格式不符/ }
+  );
+  await assert.rejects(handleRequest(upload(svg, 'image/png', { Cookie: cookie }), env), { status: 400, code: 'image_mismatch' });
+  await assert.rejects(handleRequest(upload(new Uint8Array(), 'image/png', { Cookie: cookie }), env), { status: 400, code: 'image_empty' });
 
   const big = new Uint8Array(MAX_WIDGET_IMAGE_BYTES + 1);
   big.set(PNG);
-  await assert.rejects(handleRequest(upload(big, 'image/png', { Cookie: cookie }), env), { status: 413, message: /圖片太大/ });
+  await assert.rejects(handleRequest(upload(big, 'image/png', { Cookie: cookie }), env), { status: 413, code: 'image_too_large', message: /圖片太大/ });
 
   const exact = new Uint8Array(MAX_WIDGET_IMAGE_BYTES);
   exact.set(PNG);
@@ -194,6 +197,7 @@ test('album mode uses the last played album artwork from D1', async () => {
   insertPlay(env.DB, new Date(Date.now() - 60_000).toISOString(), 'no-art', 'a1');
   const noArt = await adminState(env, cookie);
   assert.equal(noArt.payload.data.dynamic.some((field) => field.name === 'hero_image'), false);
+  assert.equal(noArt.albumImageUrl, null);
 
   insertPlay(env.DB, new Date().toISOString(), 'with-art', 'a1');
   env.DB.sqlite.prepare("UPDATE plays SET album_image_url = 'https://i.scdn.co/image/abc' WHERE track_key = 'with-art'").run();
@@ -202,6 +206,17 @@ test('album mode uses the last played album artwork from D1', async () => {
     withArt.payload.data.dynamic.find((field) => field.name === 'hero_image'),
     { type: 3, name: 'hero_image', value: { url: 'https://i.scdn.co/image/abc' } }
   );
+  // The admin page shows the cover on the album mode card in every mode.
+  assert.equal(withArt.albumImageUrl, 'https://i.scdn.co/image/abc');
+  const preview = await handleRequest(
+    request('/admin/api/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: ORIGIN, Cookie: cookie },
+      body: JSON.stringify({ settings: getDefaultSettings() })
+    }),
+    env
+  );
+  assert.equal((await preview.json()).albumImageUrl, 'https://i.scdn.co/image/abc');
 });
 
 test('admin state exposes the Discord client id, or null without one', async () => {

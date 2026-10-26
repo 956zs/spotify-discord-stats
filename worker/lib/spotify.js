@@ -1,5 +1,6 @@
 import { upsertSpotifyPlay } from './plays.js';
 import { requiredEnv } from './env.js';
+import { ERROR_CODES, HttpError } from './http.js';
 import { getState, setState } from './state.js';
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -88,7 +89,7 @@ async function spotifyTokenRequest(env, body) {
 
   const payload = await responsePayload(response);
   if (!response.ok) {
-    throw new Error(`Spotify token error ${response.status}: ${errorDetail(payload)}`);
+    throw new HttpError(`Spotify token error ${response.status}: ${errorDetail(payload)}`, 500, ERROR_CODES.spotifyTokenFailed);
   }
   return payload;
 }
@@ -103,7 +104,11 @@ async function getSpotifyRefreshToken(env) {
     return env.SPOTIFY_REFRESH_TOKEN;
   }
 
-  throw new Error('Missing Spotify refresh token. Open /spotify/login with admin token.');
+  throw new HttpError(
+    'Missing Spotify refresh token. Open /spotify/login with admin token.',
+    500,
+    ERROR_CODES.spotifyNotConnected
+  );
 }
 
 async function saveSpotifyTokenResponse(db, token) {
@@ -124,12 +129,12 @@ async function spotifyApiFetch(url, accessToken) {
 
   if (response.status === 429) {
     const retryAfter = response.headers.get('retry-after') ?? 'unknown';
-    throw new Error(`Spotify rate limited this request. Retry-After: ${retryAfter}`);
+    throw new HttpError(`Spotify rate limited this request. Retry-After: ${retryAfter}`, 500, ERROR_CODES.spotifyRateLimited);
   }
 
   const payload = await responsePayload(response);
   if (!response.ok) {
-    throw new Error(`Spotify API error ${response.status}: ${errorDetail(payload)}`);
+    throw new HttpError(`Spotify API error ${response.status}: ${errorDetail(payload)}`, 500, ERROR_CODES.spotifyApiFailed);
   }
 
   return payload;

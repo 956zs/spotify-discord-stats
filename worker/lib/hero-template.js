@@ -1,5 +1,5 @@
 import { HERO_TEMPLATE_BASE64, HERO_TEMPLATE_SHA256 } from './hero-template-data.js';
-import { HttpError } from './http.js';
+import { ERROR_CODES, HttpError } from './http.js';
 
 // The 1300x1200 hero size template shown next to the crop tool. Public: it is only a
 // guide image, the same one that ships in docs/images/templates.
@@ -15,7 +15,7 @@ export function heroTemplateBytes() {
 
 export function heroTemplateResponse(request) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
-    throw new HttpError('method not allowed', 405);
+    throw new HttpError('method not allowed', 405, ERROR_CODES.methodNotAllowed);
   }
   const etag = `"${HERO_TEMPLATE_SHA256}"`;
   const headers = {

@@ -1,6 +1,7 @@
 import { appConfig, widgetConfig } from './config.js';
+import { RECAP_TIME_ZONE } from '../shared/recap-ranges.js';
 import { MS_PER_DAY } from '../shared/time.js';
-import { HERO_IMAGE_PATH } from '../shared/widget-hero.js';
+import { HERO_ALBUM, HERO_IMAGE_PATH, resolveHeroImageUrl } from '../shared/widget-hero.js';
 import { metricCatalog } from '../shared/widget-metrics.js';
 import {
   checkAdminToken,
@@ -12,9 +13,10 @@ import {
   requireSameOriginJson
 } from './lib/admin-auth.js';
 import { adminPageResponse, loginPageResponse } from './lib/admin-page.js';
+import { pickLanguage } from './lib/admin/i18n.js';
 import { publicBaseUrl } from './lib/env.js';
 import { HERO_TEMPLATE_PATH, heroTemplateResponse } from './lib/hero-template.js';
-import { HttpError, json } from './lib/http.js';
+import { ERROR_CODES, HttpError, json } from './lib/http.js';
 import { startSpotifyLogin, handleSpotifyCallback } from './lib/oauth.js';
 import { runDueRecapReports, sendMonthlyRecap, sendWeeklyRecap } from './lib/recap-delivery.js';
 import { runSpotifyReauthReminder } from './lib/reminder.js';
@@ -43,7 +45,7 @@ export async function handleRequest(request, env) {
   // Public: Discord's media proxy fetches the uploaded hero image from here.
   if (url.pathname === HERO_IMAGE_PATH) {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
-      throw new HttpError('method not allowed', 405);
+      throw new HttpError('method not allowed', 405, ERROR_CODES.methodNotAllowed);
     }
     return widgetImageResponse(env.DB, HERO_IMAGE_KEY, request);
   }
@@ -63,7 +65,8 @@ export async function handleRequest(request, env) {
   }
 
   if (url.pathname === '/admin' || url.pathname === '/admin/') {
-    return (await isAdminRequest(request, url, env)) ? adminPageResponse() : loginPageResponse();
+    const lang = pickLanguage(request.headers.get('Accept-Language'));
+    return (await isAdminRequest(request, url, env)) ? adminPageResponse(lang) : loginPageResponse(200, false, lang);
   }
 
   if (url.pathname === '/admin/login') {
@@ -105,7 +108,7 @@ export async function handleRequest(request, env) {
     return json(await sendMonthlyRecap(env, { month: url.searchParams.get('month') }));
   }
 
-  return json({ error: 'not found' }, 404);
+  return json({ error: 'not found', code: ERROR_CODES.notFound }, 404);
 }
 
 export async function handleScheduled(env, now = new Date()) {
@@ -141,7 +144,7 @@ async function handleLogin(request, url, env) {
 
   const form = await request.formData();
   if (!checkAdminToken(form.get('token'), env)) {
-    return loginPageResponse(401, true);
+    return loginPageResponse(401, true, pickLanguage(request.headers.get('Accept-Language')));
   }
   return redirect('/admin', await createSessionCookie(env));
 }
@@ -157,8 +160,10 @@ async function handleAdminApi(request, url, env) {
       fields: widgetConfig.fields,
       metrics: metricCatalog(),
       heroImage: await heroImageState(env),
+      albumImageUrl: albumImageUrl(data),
       // Public application id, used to link to this app's widget editor.
       discordClientId: env.DISCORD_CLIENT_ID || null,
+      recapSchedule: recapSchedule(),
       status: await adminStatus(env)
     });
   }
@@ -185,7 +190,11 @@ async function handleAdminApi(request, url, env) {
   if (url.pathname === '/admin/api/preview') {
     const settings = parseSettingsInput(body.settings);
     const data = await getWidgetData(env.DB, settings, { publicBaseUrl: publicBaseUrl(env) });
-    return json({ payload: buildWidgetPayload(data, settings), fields: widgetConfig.fields });
+    return json({
+      payload: buildWidgetPayload(data, settings),
+      fields: widgetConfig.fields,
+      albumImageUrl: albumImageUrl(data)
+    });
   }
 
   if (url.pathname === '/admin/api/settings') {
@@ -196,7 +205,7 @@ async function handleAdminApi(request, url, env) {
     return json(await syncOnce(env, { forcePatch: true, refreshStats: true }));
   }
 
-  return json({ error: 'not found' }, 404);
+  return json({ error: 'not found', code: ERROR_CODES.notFound }, 404);
 }
 
 async function heroImageState(env) {
@@ -206,19 +215,47 @@ async function heroImageState(env) {
   };
 }
 
-async function adminStatus(env) {
-  const issuedAt = await getSpotifyRefreshTokenIssuedAt(env);
-  let tokenDaysLeft = null;
-  if (issuedAt && !Number.isNaN(Date.parse(issuedAt))) {
-    const expiresAt = Date.parse(issuedAt) + appConfig.spotifyRefreshTokenValidDays * MS_PER_DAY;
-    tokenDaysLeft = `${Math.ceil((expiresAt - Date.now()) / MS_PER_DAY)} 天`;
+// Album artwork of the last played song (https only, as Discord needs), for the
+// album mode card on the admin page.
+function albumImageUrl(data) {
+  return resolveHeroImageUrl(HERO_ALBUM, { lastPlayed: data.lastPlayed });
+}
+
+function recapSchedule() {
+  const recap = appConfig.recapReports;
+  return {
+    weeklyDay: recap.weeklyDay,
+    monthlyDay: recap.monthlyDay,
+    hour: recap.sendHour,
+    minute: recap.sendMinute,
+    timeZone: RECAP_TIME_ZONE
+  };
+}
+
+// Raw values only; the admin page formats and translates them.
+export async function adminStatus(env, now = Date.now()) {
+  const authorizedAt = await getSpotifyRefreshTokenIssuedAt(env);
+  const validDays = appConfig.spotifyRefreshTokenValidDays;
+  let expiresAt = null;
+  let daysLeft = null;
+  if (authorizedAt && !Number.isNaN(Date.parse(authorizedAt))) {
+    const expiresMs = Date.parse(authorizedAt) + validDays * MS_PER_DAY;
+    expiresAt = new Date(expiresMs).toISOString();
+    daysLeft = Math.ceil((expiresMs - now) / MS_PER_DAY);
   }
 
-  return [
-    ['Spotify 授權剩餘', tokenDaysLeft],
-    ['Spotify 授權時間', issuedAt],
-    ['上次推送 Discord', await getState(env.DB, 'discord_widget_last_patched_at')]
-  ];
+  return {
+    spotify: {
+      authorizedAt: authorizedAt || null,
+      expiresAt,
+      daysLeft,
+      validDays,
+      remindDays: appConfig.spotifyReauthRemindDays
+    },
+    discord: {
+      lastPushedAt: (await getState(env.DB, 'discord_widget_last_patched_at')) || null
+    }
+  };
 }
 
 async function readJson(request) {
@@ -226,7 +263,7 @@ async function readJson(request) {
     const body = await request.json();
     return body ?? {};
   } catch {
-    throw new HttpError('invalid JSON body', 400);
+    throw new HttpError('invalid JSON body', 400, ERROR_CODES.invalidJson);
   }
 }
 
@@ -239,8 +276,6 @@ function redirect(location, cookie) {
 
 function requirePost(request) {
   if (request.method !== 'POST') {
-    const error = new Error('method not allowed');
-    error.status = 405;
-    throw error;
+    throw new HttpError('method not allowed', 405, ERROR_CODES.methodNotAllowed);
   }
 }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   METRICS,
+  METRIC_GROUPS,
   currentStreak,
   formatDuration,
   formatMetric,
@@ -123,11 +124,14 @@ test('formatDuration and rangeDayCount boundaries', () => {
   assert.equal(rangeDayCount({ days: 'all', since: NOW.toISOString(), now: NOW }), 1);
 });
 
-test('metric catalog lists every metric with admin copy', () => {
+test('metric catalog lists every metric with admin copy in both languages', () => {
   const catalog = metricCatalog();
   assert.equal(catalog.length, Object.keys(METRICS).length);
   for (const metric of catalog) {
     assert.ok(metric.name && metric.group && metric.label, metric.id);
+    assert.ok(metric.nameEn && !metric.nameEn.startsWith('TODO:'), `${metric.id} has no English name`);
+    assert.ok(metric.groupEn && !metric.groupEn.startsWith('TODO:'), `${metric.id} has no English group`);
+    assert.ok(METRIC_GROUPS.includes(metric.group), metric.id);
     for (const query of METRICS[metric.id].queries) {
       assert.ok(QUERY_IDS.includes(query), `${metric.id} uses unknown query ${query}`);
     }

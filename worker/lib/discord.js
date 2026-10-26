@@ -1,4 +1,5 @@
 import { requiredEnv } from './env.js';
+import { ERROR_CODES, HttpError } from './http.js';
 
 const DISCORD_API_URL = 'https://discord.com/api/v9';
 const DISCORD_MESSAGE_API_URL = 'https://discord.com/api/v10';
@@ -23,7 +24,11 @@ export async function sendDiscordDmPayload(env, payload) {
 
   const message = await messageResponse.json().catch(() => ({}));
   if (!messageResponse.ok) {
-    throw new Error(`Discord send DM failed ${messageResponse.status}: ${JSON.stringify(message)}`);
+    throw new HttpError(
+      `Discord send DM failed ${messageResponse.status}: ${JSON.stringify(message)}`,
+      500,
+      ERROR_CODES.discordDmFailed
+    );
   }
 }
 
@@ -36,7 +41,11 @@ async function createDiscordDmChannel(env) {
 
   const channel = await channelResponse.json().catch(() => ({}));
   if (!channelResponse.ok) {
-    throw new Error(`Discord create DM failed ${channelResponse.status}: ${JSON.stringify(channel)}`);
+    throw new HttpError(
+      `Discord create DM failed ${channelResponse.status}: ${JSON.stringify(channel)}`,
+      500,
+      ERROR_CODES.discordDmFailed
+    );
   }
   return channel;
 }

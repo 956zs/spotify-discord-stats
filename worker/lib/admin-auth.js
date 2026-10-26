@@ -1,5 +1,5 @@
 import { requiredEnv } from './env.js';
-import { HttpError } from './http.js';
+import { ERROR_CODES, HttpError } from './http.js';
 
 // The admin page signs in once with ADMIN_TOKEN and then carries a signed session
 // cookie, so the token stops appearing in URLs and browser history. Rotating
@@ -22,7 +22,7 @@ export async function isAdminRequest(request, url, env) {
 
 export async function requireAdmin(request, url, env) {
   if (!(await isAdminRequest(request, url, env))) {
-    throw new HttpError('unauthorized', 401);
+    throw new HttpError('unauthorized', 401, ERROR_CODES.unauthorized);
   }
 }
 
@@ -47,14 +47,14 @@ export function requireSameOrigin(request, url) {
   const site = request.headers.get('Sec-Fetch-Site');
   if (site) {
     if (site !== 'same-origin') {
-      throw new HttpError('forbidden', 403);
+      throw new HttpError('forbidden', 403, ERROR_CODES.forbidden);
     }
     return;
   }
 
   const origin = request.headers.get('Origin');
   if (origin && origin !== url.origin) {
-    throw new HttpError('forbidden', 403);
+    throw new HttpError('forbidden', 403, ERROR_CODES.forbidden);
   }
 }
 
@@ -63,7 +63,7 @@ export function requireSameOrigin(request, url) {
 export function requireSameOriginJson(request, url) {
   requireSameOrigin(request, url);
   if (!request.headers.get('Content-Type')?.startsWith('application/json')) {
-    throw new HttpError('expected application/json', 415);
+    throw new HttpError('expected application/json', 415, ERROR_CODES.expectedJson);
   }
 }
 

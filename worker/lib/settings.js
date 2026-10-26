@@ -1,6 +1,6 @@
 import { appConfig, widgetConfig } from '../config.js';
 import { defaultSettings, mergeSettings, validateSettings } from '../../shared/widget-settings.js';
-import { HttpError } from './http.js';
+import { ERROR_CODES, HttpError } from './http.js';
 import { getState, setState } from './state.js';
 
 const SETTINGS_STATE_KEY = 'admin_settings';
@@ -34,7 +34,7 @@ export async function loadSettings(db) {
 export function parseSettingsInput(input) {
   const { settings, errors } = validateSettings(input, widgetConfig.fields.slots.length);
   if (!settings) {
-    throw new HttpError(`invalid settings: ${errors.join('; ')}`, 400);
+    throw new HttpError(`invalid settings: ${errors.join('; ')}`, 400, ERROR_CODES.invalidSettings, errors);
   }
   return settings;
 }

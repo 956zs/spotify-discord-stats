@@ -1,5 +1,5 @@
 import { handleRequest, handleScheduled } from './app.js';
-import { json } from './lib/http.js';
+import { errorBody, json } from './lib/http.js';
 
 export default {
   async fetch(request, env) {
@@ -7,7 +7,7 @@ export default {
       return await handleRequest(request, env);
     } catch (error) {
       console.error(error);
-      return json({ error: error.message }, error.status ?? 500);
+      return json(errorBody(error), error.status ?? 500);
     }
   },
 
