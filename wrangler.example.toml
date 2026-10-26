@@ -1,0 +1,40 @@
+# Copy this file to wrangler.toml and fill in your own values.
+# wrangler.toml is gitignored so your IDs stay out of the repo.
+
+name = "spotify-discord-stats"
+main = "worker/index.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+# Optional: only needed if your Cloudflare login can see more than one account.
+# account_id = "your-cloudflare-account-id"
+
+# Optional: serve the Worker on your own domain instead of *.workers.dev.
+# The domain must already be on Cloudflare.
+# routes = [
+#   { pattern = "stats.example.com", custom_domain = true }
+# ]
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[observability]
+enabled = false
+
+[observability.logs]
+enabled = false
+invocation_logs = false
+
+[vars]
+DISCORD_CLIENT_ID = "your-discord-application-id"
+DISCORD_USER_ID = "your-discord-user-id"
+# Optional: send DMs to a different user. Defaults to DISCORD_USER_ID.
+# DISCORD_REMINDER_USER_ID = "your-discord-user-id"
+SPOTIFY_CLIENT_ID = "your-spotify-client-id"
+SPOTIFY_REDIRECT_URI = "https://spotify-discord-stats.your-subdomain.workers.dev/spotify/callback"
+PUBLIC_BASE_URL = "https://spotify-discord-stats.your-subdomain.workers.dev"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "spotify-discord-stats"
+database_id = "paste-database-id-here"

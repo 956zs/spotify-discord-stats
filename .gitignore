@@ -7,3 +7,4 @@ npm-debug.log*
 .wrangler-dry-run/
 .cloudflare-admin-token
 .spotify-login-url
+wrangler.toml
