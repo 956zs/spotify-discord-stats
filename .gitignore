@@ -8,3 +8,4 @@ npm-debug.log*
 .cloudflare-admin-token
 .spotify-login-url
 wrangler.toml
+.dev.vars
