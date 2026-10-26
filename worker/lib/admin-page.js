@@ -100,14 +100,15 @@ button:disabled { opacity:.4; cursor:default; }
 .sticky { position:sticky; top:16px; }
 .card { background:#232428; border-radius:8px; overflow:hidden; transition:opacity .15s; }
 .card.loading { opacity:.45; }
-.card-hero-img { display:block; width:100%; aspect-ratio:13 / 12; object-fit:cover; background:var(--bg); }
+.card-hero-img { position:absolute; top:0; right:0; height:100%; aspect-ratio:13 / 12; object-fit:cover; -webkit-mask-image:linear-gradient(to right, transparent, #000 35%); mask-image:linear-gradient(to right, transparent, #000 35%); pointer-events:none; }
+.card-top.with-hero > :not(.card-hero-img) { position:relative; max-width:62%; }
 .hero-modes { display:flex; flex-wrap:wrap; gap:6px 18px; margin-bottom:10px; }
 .hero-modes .check { margin:0; }
 .hero-upload { display:grid; grid-template-columns:120px minmax(0,1fr); gap:12px; align-items:start; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--raised); margin-bottom:10px; }
 .hero-thumb { width:120px; aspect-ratio:13 / 12; border-radius:6px; background:var(--bg); border:1px dashed var(--line); display:grid; place-items:center; color:var(--muted); font-size:11px; overflow:hidden; }
 .hero-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
 .hero-upload input[type=file] { margin:0 0 8px; padding:5px; }
-.card-top { padding:14px; border-bottom:1px solid var(--line); }
+.card-top { position:relative; padding:14px; border-bottom:1px solid var(--line); overflow:hidden; }
 .card-user { font-size:11px; color:var(--muted); }
 .card-hero { font-size:17px; font-weight:600; margin:6px 0 2px; }
 .card-small { font-size:11px; color:var(--muted); word-break:break-word; }
@@ -230,8 +231,8 @@ const ADMIN_BODY = `<main>
       <section>
         <h2>預覽</h2>
         <div class="card" id="pCard">
-          <img class="card-hero-img gone" id="pHeroImg" alt="Widget 大圖">
-          <div class="card-top">
+          <div class="card-top" id="pTop">
+            <img class="card-hero-img gone" id="pHeroImg" alt="Widget 大圖">
             <div class="card-user" id="pUser"></div>
             <div class="card-hero" id="pHero"></div>
             <div class="card-small" id="pDuring"></div>
@@ -619,6 +620,7 @@ function renderPreview(payload, map) {
   const heroUrl = heroFieldUrl(payload, map);
   const heroImg = $('pHeroImg');
   heroImg.classList.toggle('gone', !heroUrl);
+  $('pTop').classList.toggle('with-hero', Boolean(heroUrl));
   if (heroUrl) {
     heroImg.src = heroPreviewSrc(heroUrl);
   } else {
