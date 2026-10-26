@@ -85,8 +85,16 @@ export async function handleRequest(request, env) {
 }
 
 export async function handleScheduled(env, now = new Date()) {
-  const result = await syncOnce(env);
-  console.log('scheduled sync', result);
+  // A failed sync (Spotify or widget PATCH) must not skip the reminder and recaps;
+  // it is rethrown at the end so the cron run still shows as failed.
+  let syncError = null;
+  try {
+    const result = await syncOnce(env);
+    console.log('scheduled sync', result);
+  } catch (error) {
+    syncError = error;
+    console.warn('scheduled sync failed', error.message);
+  }
 
   try {
     const reminder = await runSpotifyReauthReminder(env);
@@ -97,6 +105,10 @@ export async function handleScheduled(env, now = new Date()) {
 
   const recap = await runDueRecapReports(env, now);
   console.log('recap reports', recap);
+
+  if (syncError) {
+    throw syncError;
+  }
 }
 
 async function handleLogin(request, url, env) {
