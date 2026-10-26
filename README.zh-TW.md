@@ -274,6 +274,7 @@ widget 最上面的大圖可以在 **Widget 大圖** 選：固定素材（`widge
 在 admin 頁上傳的圖片，或最近播放那首歌的專輯封面。如果你的 widget 是在這個選項出現之前做的，
 要到 widget 編輯器把大圖改成 User Data `hero_image`，Fallback 選 `widget_hero`，
 或重新貼一次 [設定檔](docs/discord-widget-config.json)。Discord 可能會快取舊圖一陣子。
+上傳時頁面會開一個裁切工具，把圖裁成剛好 1300×1200，並用參考線標出哪裡會淡出、哪裡會被文字蓋到。
 
 所有設定和統計項目都列在 [docs/admin-page.md](docs/admin-page.md)（英文）。
 

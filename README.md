@@ -319,6 +319,8 @@ If you set up your widget before this option existed, open the widget editor
 and change the hero image to User Data `hero_image` with `widget_hero` as the
 Fallback, or paste [the config](docs/discord-widget-config.json) again.
 Discord may keep showing the old picture for a while.
+When you upload, the page opens a crop tool that cuts your picture to exactly
+1300×1200, with guides showing which parts fade out or sit under the text.
 
 Every setting and stat is listed in [docs/admin-page.md](docs/admin-page.md).
 

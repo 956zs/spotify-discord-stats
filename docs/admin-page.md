@@ -20,6 +20,14 @@ The page interface is in Traditional Chinese.
     `PUBLIC_BASE_URL/widget/hero?v=<hash>`, so a new upload changes the URL and
     skips Discord's cache. With no image uploaded, or no `PUBLIC_BASE_URL` /
     `SPOTIFY_REDIRECT_URI` to build a public URL, it falls back to the asset.
+    Picking a file opens a crop tool in the browser: drag to move, slider or
+    mouse wheel to zoom, with guides for the template's boundaries area (top
+    4%), heavy/minor fade zones (left 0–17% / 17–35%) and the three subtitle
+    lines. 套用並上傳 uploads exactly 1300×1200 as PNG, or as WebP (quality
+    0.92, then 0.85) or JPEG (0.9) when the PNG is over 1.5 MB. Cropping
+    turns a GIF into a still image; 不裁切直接上傳 uploads the original file
+    instead. The size template (`docs/images/templates/hero-guide-1300x1200.png`)
+    is shown next to the upload box and in the crop tool, with a download link.
   - 最近播放的專輯封面 (last played album cover): the Spotify album artwork
     of the last played song. Falls back to the asset when that play has no
     artwork (for example imported history).
@@ -27,6 +35,10 @@ The page interface is in Traditional Chinese.
   The mode is saved with the other settings; upload and delete take effect
   immediately. The widget editor must use User Data `hero_image` with a
   Fallback, see [discord-widget.md](discord-widget.md#data-field-names).
+  The Worker cannot read the widget editor, so in upload and album mode the
+  section shows these steps with a link to the app's widget editor (built
+  from `DISCORD_CLIENT_ID`) until you tick 我已經在 widget 編輯器設定好了;
+  that tick is saved as `widget.heroEditorConfirmed` and only hides the note.
   The Node/VPS runtime has no admin page or image store: it reads the mode
   from `heroImage` in `config/widget.json`, supports `album`, and treats
   `upload` as `asset`.
@@ -93,7 +105,7 @@ The recap routes send real Discord DMs; they are not previews.
 The page itself uses these JSON routes (signed-in session, same-origin only):
 
 ```text
-GET  /admin/api/state              settings, defaults, preview payload, hero image info
+GET  /admin/api/state              settings, defaults, preview payload, hero image info, discordClientId
 POST /admin/api/preview            preview payload for unsaved settings
 POST /admin/api/settings           save settings
 POST /admin/api/push               sync and push to Discord now
@@ -108,9 +120,15 @@ WebP and GIF files are stored.
 
 ```text
 GET  /widget/hero                  the uploaded hero image, no sign-in (Discord fetches it)
+GET  /admin/hero-template.png      the 1300×1200 hero size template, no sign-in
 GET  /health                       health check
 ```
 
 `/widget/hero` returns the stored Content-Type with
 `Cache-Control: public, max-age=31536000, immutable` and an ETag, or 404 when
 nothing is uploaded.
+
+`/admin/hero-template.png` is embedded in the Worker as base64
+(`worker/lib/hero-template-data.js`). After changing the PNG in
+`docs/images/templates/`, regenerate it with
+`node scripts/build-hero-template.js`; a test fails if the two drift apart.
