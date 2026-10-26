@@ -34,11 +34,6 @@ The code that turns report data into Discord message text.
 
 The scheduling and sending logic that decides when to DM a report.
 
-## Layout Demo
-
-A throwaway local prototype that shows possible Discord Components v2 report
-layouts before production report delivery code is written.
-
 ## Send Route
 
 An optional admin-only HTTP route that builds a report and sends it by Discord
