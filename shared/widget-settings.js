@@ -24,6 +24,7 @@ export function defaultSettings(appConfig, widgetConfig) {
       mainTitle: widgetConfig.mainTitle,
       lastUpdatedPrefix: widgetConfig.lastUpdatedPrefix,
       heroImage: normalizeHeroMode(widgetConfig.heroImage),
+      heroEditorConfirmed: widgetConfig.heroEditorConfirmed === true,
       slots: widgetConfig.slots.map((slot) => ({
         metric: slot.metric,
         range: slot.range ?? GLOBAL_RANGE,
@@ -78,6 +79,8 @@ export function validateSettings(input, slotCount) {
       lastUpdatedPrefix: text(widgetInput.lastUpdatedPrefix, 'widget.lastUpdatedPrefix', errors),
       // A missing or unknown hero mode falls back to the fixed asset instead of failing.
       heroImage: normalizeHeroMode(widgetInput.heroImage),
+      // Only an acknowledgement on the admin page; anything but true means "not yet".
+      heroEditorConfirmed: widgetInput.heroEditorConfirmed === true,
       slots: slots(widgetInput.slots, slotCount, errors)
     }
   };

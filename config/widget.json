@@ -4,6 +4,7 @@
   "lastUpdatedPrefix": "last updated: ",
   "mainTitle": "✦ {range} plays: {count}",
   "heroImage": "asset",
+  "heroEditorConfirmed": false,
   "slots": [
     {
       "metric": "songsPlayed",

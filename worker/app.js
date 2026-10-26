@@ -13,6 +13,7 @@ import {
 } from './lib/admin-auth.js';
 import { adminPageResponse, loginPageResponse } from './lib/admin-page.js';
 import { publicBaseUrl } from './lib/env.js';
+import { HERO_TEMPLATE_PATH, heroTemplateResponse } from './lib/hero-template.js';
 import { HttpError, json } from './lib/http.js';
 import { startSpotifyLogin, handleSpotifyCallback } from './lib/oauth.js';
 import { runDueRecapReports, sendMonthlyRecap, sendWeeklyRecap } from './lib/recap-delivery.js';
@@ -45,6 +46,11 @@ export async function handleRequest(request, env) {
       throw new HttpError('method not allowed', 405);
     }
     return widgetImageResponse(env.DB, HERO_IMAGE_KEY, request);
+  }
+
+  // Public: the hero size template is just a guide image, no secrets.
+  if (url.pathname === HERO_TEMPLATE_PATH) {
+    return heroTemplateResponse(request);
   }
 
   if (url.pathname === '/spotify/login') {
@@ -151,6 +157,8 @@ async function handleAdminApi(request, url, env) {
       fields: widgetConfig.fields,
       metrics: metricCatalog(),
       heroImage: await heroImageState(env),
+      // Public application id, used to link to this app's widget editor.
+      discordClientId: env.DISCORD_CLIENT_ID || null,
       status: await adminStatus(env)
     });
   }

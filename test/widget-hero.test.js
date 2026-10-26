@@ -121,3 +121,40 @@ test('resolveHeroImageUrl handles empty input', () => {
   assert.equal(resolveHeroImageUrl('upload', {}), null);
   assert.equal(resolveHeroImageUrl(undefined, {}), null);
 });
+
+test('heroEditorConfirmed defaults to false and only a real true counts', () => {
+  assert.equal(defaultSettings(APP_CONFIG, WIDGET_CONFIG).widget.heroEditorConfirmed, false);
+  assert.equal(defaultSettings(APP_CONFIG, { ...WIDGET_CONFIG, heroEditorConfirmed: true }).widget.heroEditorConfirmed, true);
+  assert.equal(defaultSettings(APP_CONFIG, { ...WIDGET_CONFIG, heroEditorConfirmed: 'yes' }).widget.heroEditorConfirmed, false);
+
+  for (const value of [true, false]) {
+    const settings = settingsWith('upload');
+    settings.widget.heroEditorConfirmed = value;
+    assert.equal(validateSettings(settings, 1).settings.widget.heroEditorConfirmed, value);
+  }
+  const missing = settingsWith('upload');
+  delete missing.widget.heroEditorConfirmed;
+  assert.equal(validateSettings(missing, 1).settings.widget.heroEditorConfirmed, false);
+  for (const garbage of [null, '', 'true', 1, 0, {}, [], '<script>']) {
+    const settings = settingsWith('album');
+    settings.widget.heroEditorConfirmed = garbage;
+    const result = validateSettings(settings, 1);
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.settings.widget.heroEditorConfirmed, false);
+  }
+});
+
+test('older stored settings without heroEditorConfirmed merge to false', () => {
+  const defaults = defaultSettings(APP_CONFIG, WIDGET_CONFIG);
+  const older = structuredClone(defaults);
+  delete older.widget.heroEditorConfirmed;
+  assert.equal(mergeSettings(defaults, older).widget.heroEditorConfirmed, false);
+  older.widget.heroEditorConfirmed = true;
+  assert.equal(mergeSettings(defaults, older).widget.heroEditorConfirmed, true);
+});
+
+test('heroEditorConfirmed does not change the payload', () => {
+  const confirmed = settingsWith('upload');
+  confirmed.widget.heroEditorConfirmed = true;
+  assert.deepEqual(buildWidgetPayload(data(), confirmed, FIELDS), buildWidgetPayload(data(), settingsWith('upload'), FIELDS));
+});

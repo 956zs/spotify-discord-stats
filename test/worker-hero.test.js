@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { handleRequest } from '../worker/app.js';
 import { getDefaultSettings, saveSettings } from '../worker/lib/settings.js';
+import { readFileSync } from 'node:fs';
+import { HERO_TEMPLATE_PATH, heroTemplateBytes } from '../worker/lib/hero-template.js';
 import { MAX_WIDGET_IMAGE_BYTES, detectImageType } from '../worker/lib/widget-images.js';
 import { createD1, insertPlay } from './helpers/d1.js';
 
@@ -200,4 +202,52 @@ test('album mode uses the last played album artwork from D1', async () => {
     withArt.payload.data.dynamic.find((field) => field.name === 'hero_image'),
     { type: 3, name: 'hero_image', value: { url: 'https://i.scdn.co/image/abc' } }
   );
+});
+
+test('admin state exposes the Discord client id, or null without one', async () => {
+  const withId = createEnv({ DISCORD_CLIENT_ID: '123456789012345678' });
+  assert.equal((await adminState(withId, await login(withId))).discordClientId, '123456789012345678');
+  const withoutId = createEnv();
+  assert.equal((await adminState(withoutId, await login(withoutId))).discordClientId, null);
+  const emptyId = createEnv({ DISCORD_CLIENT_ID: '' });
+  assert.equal((await adminState(emptyId, await login(emptyId))).discordClientId, null);
+});
+
+test('hero editor confirmation round-trips through the settings api', async () => {
+  const env = createEnv();
+  const cookie = await login(env);
+  assert.equal((await adminState(env, cookie)).settings.widget.heroEditorConfirmed, false);
+  const settings = getDefaultSettings();
+  settings.widget.heroImage = 'upload';
+  settings.widget.heroEditorConfirmed = true;
+  const saved = await handleRequest(
+    request('/admin/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: ORIGIN, Cookie: cookie },
+      body: JSON.stringify({ settings })
+    }),
+    env
+  );
+  assert.equal(saved.status, 200);
+  assert.equal((await adminState(env, cookie)).settings.widget.heroEditorConfirmed, true);
+});
+
+test('hero template is served publicly and matches the PNG in docs', async () => {
+  const png = new Uint8Array(readFileSync(new URL('../docs/images/templates/hero-guide-1300x1200.png', import.meta.url)));
+  assert.deepEqual(heroTemplateBytes(), png);
+
+  const env = createEnv();
+  const response = await handleRequest(request(HERO_TEMPLATE_PATH), env);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Content-Type'), 'image/png');
+  assert.match(response.headers.get('Cache-Control'), /^public, max-age=\d+$/);
+  assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), png);
+
+  const etag = response.headers.get('ETag');
+  const notModified = await handleRequest(request(HERO_TEMPLATE_PATH, { headers: { 'If-None-Match': etag } }), env);
+  assert.equal(notModified.status, 304);
+  const head = await handleRequest(request(HERO_TEMPLATE_PATH, { method: 'HEAD' }), env);
+  assert.equal(head.status, 200);
+  await assert.rejects(handleRequest(request(HERO_TEMPLATE_PATH, { method: 'POST' }), env), { status: 405 });
 });

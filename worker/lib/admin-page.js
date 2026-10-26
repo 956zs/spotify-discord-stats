@@ -1,6 +1,12 @@
 import { cryptoRandomHex } from './crypto.js';
+import { HERO_TEMPLATE_PATH } from './hero-template.js';
+import { MAX_WIDGET_IMAGE_BYTES } from './widget-images.js';
 
 const NONCE_BYTES = 16;
+// The hero crop tool outputs exactly the size Discord shows the Widget Top image at.
+const CROP_WIDTH = 1300;
+const CROP_HEIGHT = 1200;
+const CROP_MAX_ZOOM = 4;
 
 export function adminPageResponse() {
   return page('Spotify Stats Admin', ADMIN_BODY, ADMIN_SCRIPT);
@@ -110,6 +116,42 @@ button:disabled { opacity:.4; cursor:default; }
 .hero-thumb { width:120px; aspect-ratio:13 / 12; border-radius:6px; background:var(--bg); border:1px dashed var(--line); display:grid; place-items:center; color:var(--muted); font-size:11px; overflow:hidden; }
 .hero-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
 .hero-upload input[type=file] { margin:0 0 8px; padding:5px; }
+.hero-template { display:flex; gap:10px; align-items:flex-start; margin:10px 0 0; font-size:12px; color:var(--muted); }
+.hero-template img { width:96px; height:auto; aspect-ratio:13 / 12; flex:none; border-radius:6px; border:1px solid var(--line); background:var(--bg); }
+.hero-template figcaption a, .warn-box a { color:#949cf7; }
+.warn-box { border:1px solid rgba(240,178,50,.55); background:rgba(240,178,50,.08); border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:13px; }
+.warn-box.done { border-color:var(--line); background:var(--raised); padding:6px 12px; }
+.warn-box strong { color:var(--warn); }
+.warn-box p { margin:4px 0 8px; }
+.warn-box .check { margin-top:8px; }
+.note-line { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0; color:var(--muted); font-size:12px; }
+.note-line button { padding:2px 10px; font-size:12px; }
+code { font:12px ui-monospace, monospace; background:var(--bg); padding:1px 5px; border-radius:4px; }
+dialog.crop { width:min(1000px, calc(100vw - 24px)); max-width:none; max-height:calc(100vh - 24px); padding:16px; background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:10px; }
+dialog.crop::backdrop { background:rgba(0,0,0,.72); }
+.crop-layout { display:grid; grid-template-columns:minmax(0,1fr) 220px; gap:16px; align-items:start; }
+.crop-stage { position:relative; width:min(100%, calc((100vh - 250px) * 13 / 12)); aspect-ratio:13 / 12; margin:0 auto; background:#000; border-radius:6px; overflow:hidden; touch-action:none; user-select:none; cursor:grab; }
+.crop-stage.dragging { cursor:grabbing; }
+.crop-stage:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.crop-stage canvas { display:block; width:100%; height:100%; }
+.crop-guides { position:absolute; inset:0; pointer-events:none; font-size:11px; line-height:1.3; color:#fff; }
+.crop-guides span { position:absolute; padding:1px 5px; border-radius:3px; background:rgba(0,0,0,.6); white-space:nowrap; }
+.g-top { position:absolute; left:0; right:0; top:0; height:4%; background:rgba(242,63,67,.38); border-bottom:1px dashed #f23f43; }
+.g-top span { left:50%; top:100%; transform:translateX(-50%); margin-top:2px; }
+.g-heavy, .g-minor { position:absolute; top:4%; bottom:0; }
+.g-heavy { left:0; width:17%; background:rgba(0,0,0,.55); border-right:1px dashed rgba(255,255,255,.6); }
+.g-minor { left:17%; width:18%; background:rgba(0,0,0,.25); border-right:1px dashed rgba(255,255,255,.45); }
+.g-heavy span, .g-minor span { left:50%; top:40%; transform:translateX(-50%); }
+.g-line { position:absolute; left:0; right:0; border-top:2px dashed #23a55a; }
+.g-line span { right:6px; bottom:2px; background:rgba(35,165,90,.85); }
+.g-line1 { top:69.6%; } .g-line2 { top:80%; } .g-line3 { top:90%; }
+.crop-controls { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+.crop-controls label { margin:0; }
+.crop-zoom { display:flex; align-items:center; gap:8px; flex:1; min-width:200px; color:var(--text); font-size:13px; }
+.crop-zoom input { margin:0; padding:0; flex:1; }
+.crop-side .hero-template { flex-direction:column; margin:0; }
+.crop-side .hero-template img { width:100%; }
+.crop-actions { margin-top:12px; justify-content:flex-end; }
 .card-top { position:relative; padding:14px; border-bottom:1px solid var(--line); }
 .card-user { font-size:11px; color:var(--muted); }
 .card-hero { font-size:17px; font-weight:600; margin:6px 0 2px; }
@@ -157,6 +199,11 @@ dt { color:var(--muted); } dd { margin:0; }
   .slot-label, .slot-value { grid-column:2; }
   .kbd { display:none; }
   .hero-upload { grid-template-columns:1fr; }
+  dialog.crop { padding:12px; }
+  .crop-layout { grid-template-columns:1fr; }
+  .crop-stage { width:100%; }
+  .crop-side .hero-template { flex-direction:row; }
+  .crop-side .hero-template img { width:96px; }
 }
 `;
 
@@ -208,15 +255,25 @@ const ADMIN_BODY = `<main>
             <label class="check"><input type="radio" name="heroImage" value="upload"> 自訂上傳</label>
             <label class="check"><input type="radio" name="heroImage" value="album"> 最近播放的專輯封面</label>
           </div>
+          <div id="heroEditorBox" class="warn-box gone">
+            <div id="heroEditorSteps">
+              <strong>還要改 widget 編輯器，Discord 才會換圖</strong>
+              <p>到 Discord Developer Portal 的 widget 編輯器，把 Widget Top 的 Image 改成 Value Type「User Data」、Data Field 填 <code id="heroEditorField">hero_image</code>、打開 Fallback 並選回原本的圖片素材，然後按 Save changes（已發佈的 widget 會再問一次，按 Update）。沒改的話 Discord 會一直顯示原本的圖。</p>
+              <a id="heroEditorLink" href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer">打開 widget 編輯器 ↗</a>
+              <label class="check"><input type="checkbox" name="heroEditorConfirmed"> 我已經在 widget 編輯器設定好了</label>
+            </div>
+            <p id="heroEditorDone" class="note-line gone">✓ 已在 widget 編輯器設定好大圖 <button type="button" id="heroEditorShowBtn">再看一次步驟</button></p>
+          </div>
           <div id="heroUploadBox" class="hero-upload gone">
             <div class="hero-thumb" id="heroThumb">尚未上傳</div>
             <div>
               <input type="file" id="heroFile" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="選擇圖片">
               <div class="actions">
-                <button type="button" id="heroUploadBtn">上傳</button>
+                <button type="button" id="heroUploadBtn">裁切並上傳</button>
                 <button type="button" id="heroDeleteBtn">刪除</button>
               </div>
               <p class="hint spaced" id="heroMeta">PNG、JPEG、WebP 或 GIF，最大 1.5 MB。上傳和刪除會立即生效。</p>
+              ${templateFigure()}
             </div>
           </div>
           <div id="heroStatus" class="status"></div>
@@ -270,13 +327,57 @@ const ADMIN_BODY = `<main>
     <button type="button" id="saveOnlyBtn">只儲存</button>
     <button type="button" class="primary" id="saveBtn">儲存並推送到 Discord</button>
   </div>
-</div>`;
+</div>
+<dialog id="cropDialog" class="crop" aria-labelledby="cropTitle" aria-describedby="cropHint">
+  <h2 id="cropTitle">裁切 Widget 大圖</h2>
+  <p class="hint" id="cropHint">拖曳移動圖片，用滑桿或滑鼠滾輪縮放（鍵盤：方向鍵移動、+ / − 縮放）。輸出固定 1300×1200；參考線不會出現在上傳的圖上。<span id="cropGifHint" class="gone">GIF 裁切後會變成靜態圖片；要保留動畫請按「不裁切直接上傳」。</span></p>
+  <div class="crop-layout">
+    <div>
+      <div class="crop-stage" id="cropStage" tabindex="0" aria-label="裁切範圍：拖曳或用方向鍵移動，+ / − 縮放">
+        <canvas id="cropCanvas" width="${CROP_WIDTH}" height="${CROP_HEIGHT}"></canvas>
+        <div class="crop-guides" id="cropGuides" aria-hidden="true">
+          <div class="g-top"><span>BOUNDARIES AREA（會超出卡片上緣）</span></div>
+          <div class="g-heavy"><span>強淡出</span></div>
+          <div class="g-minor"><span>弱淡出</span></div>
+          <div class="g-line g-line1"><span>subtitle 1</span></div>
+          <div class="g-line g-line2"><span>subtitle 2</span></div>
+          <div class="g-line g-line3"><span>subtitle 3</span></div>
+        </div>
+      </div>
+      <div class="crop-controls">
+        <label class="crop-zoom">縮放<input type="range" id="cropZoom" min="1" max="${CROP_MAX_ZOOM}" step="0.01" value="1"></label>
+        <label class="check"><input type="checkbox" id="cropGuidesToggle" checked> 顯示參考線</label>
+      </div>
+    </div>
+    <aside class="crop-side">${templateFigure()}</aside>
+  </div>
+  <div id="cropStatus" class="status spaced"></div>
+  <div class="actions crop-actions">
+    <button type="button" id="cropCancelBtn">取消</button>
+    <button type="button" id="cropRawBtn">不裁切直接上傳</button>
+    <button type="button" class="primary" id="cropApplyBtn">套用並上傳</button>
+  </div>
+</dialog>`;
+
+function templateFigure() {
+  return `<figure class="hero-template">
+    <img src="${HERO_TEMPLATE_PATH}" alt="大圖範本：1300×1200 參考線" width="1300" height="1200" loading="lazy">
+    <figcaption>範本：1300×1200，左邊兩段會淡出，最上面 4% 會超出卡片。<a href="${HERO_TEMPLATE_PATH}" download="hero-guide-1300x1200.png">下載範本</a></figcaption>
+  </figure>`;
+}
 
 const ADMIN_SCRIPT = `
 const PRESET_DAYS = ['7', '28', '90', '365'];
 const HERO_PATH = '/widget/hero';
 const HERO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
-const HERO_MAX_BYTES = 1.5 * 1024 * 1024;
+const HERO_MAX_BYTES = ${MAX_WIDGET_IMAGE_BYTES};
+const CROP_WIDTH = ${CROP_WIDTH};
+const CROP_HEIGHT = ${CROP_HEIGHT};
+const CROP_MAX_ZOOM = ${CROP_MAX_ZOOM};
+// Tried in order when the cropped PNG is over the upload limit.
+const CROP_FALLBACKS = [['image/webp', 0.92], ['image/webp', 0.85], ['image/jpeg', 0.9]];
+const IMAGE_FORMAT_NAMES = { 'image/png': 'PNG', 'image/jpeg': 'JPEG', 'image/webp': 'WebP', 'image/gif': 'GIF' };
+const EDITOR_HOME = 'https://discord.com/developers/applications';
 const SLOT_RANGES = [
   ['global', '跟隨全域'], ['7', '7 天'], ['28', '28 天'], ['90', '90 天'], ['180', '180 天'],
   ['365', '365 天'], ['all', '全部歷史'], ['custom', '自訂天數']
@@ -286,6 +387,10 @@ let defaults = null;
 let metrics = [];
 let fieldMap = null;
 let heroState = { upload: null, publicBaseUrl: null };
+let discordClientId = null;
+let heroStepsOpen = false;
+let crop = null;
+let cropFrame = 0;
 let lastPayload = null;
 let savedSnapshot = null;
 let previewTimer = null;
@@ -339,6 +444,8 @@ function fillForm(settings) {
   }
   input('recapEnabled').checked = settings.recapEnabled;
   input('heroImage').value = settings.widget.heroImage || 'asset';
+  input('heroEditorConfirmed').checked = settings.widget.heroEditorConfirmed === true;
+  heroStepsOpen = false;
   for (const name of ['username', 'topHeroTitle', 'mainTitle', 'lastUpdatedPrefix']) {
     input(name).value = settings.widget[name];
   }
@@ -357,6 +464,7 @@ function readForm() {
       mainTitle: input('mainTitle').value,
       lastUpdatedPrefix: input('lastUpdatedPrefix').value,
       heroImage: input('heroImage').value || 'asset',
+      heroEditorConfirmed: input('heroEditorConfirmed').checked,
       slots: readSlots()
     }
   };
@@ -398,6 +506,7 @@ function renderHero() {
     $('heroMeta').textContent = 'PNG、JPEG、WebP 或 GIF，最大 1.5 MB。上傳和刪除會立即生效。';
   }
   $('heroDeleteBtn').disabled = !upload;
+  renderHeroEditorNote(mode);
 
   const hasImage = Boolean(heroFieldUrl(lastPayload, fieldMap));
   let text = '';
@@ -416,44 +525,282 @@ function renderHero() {
   }
 }
 
-async function uploadHero() {
+// The widget editor has to read hero_image from User Data, which the Worker cannot
+// check, so upload and album modes show the steps until they are confirmed.
+function widgetEditorUrl(clientId) {
+  return /^\\d+$/.test(clientId || '') ? EDITOR_HOME + '/' + clientId + '/widget' : EDITOR_HOME;
+}
+
+function renderHeroEditorNote(mode) {
+  const confirmed = input('heroEditorConfirmed').checked;
+  const collapsed = confirmed && !heroStepsOpen;
+  const box = $('heroEditorBox');
+  box.classList.toggle('gone', mode === 'asset');
+  box.classList.toggle('done', collapsed);
+  $('heroEditorSteps').classList.toggle('gone', collapsed);
+  $('heroEditorDone').classList.toggle('gone', !collapsed);
+  $('heroEditorLink').href = widgetEditorUrl(discordClientId);
+  $('heroEditorField').textContent = fieldMap?.heroImage || 'hero_image';
+}
+
+function formatSize(bytes) {
+  return bytes >= 1024 * 1024 ? (bytes / 1024 / 1024).toFixed(2) + ' MB' : Math.round(bytes / 1024) + ' KB';
+}
+
+function checkHeroFile(file) {
+  if (!HERO_TYPES.includes(file.type)) return '只接受 PNG、JPEG、WebP 或 GIF 圖片';
+  if (file.size > HERO_MAX_BYTES) return '圖片太大了（' + formatSize(file.size) + '），上限是 1.5 MB，請先壓縮或縮小尺寸';
+  return '';
+}
+
+// Uploads through the same route and server-side checks for cropped and original files.
+async function sendHero(body, type, doneText) {
+  const response = await fetch('/admin/api/hero-image', {
+    method: 'POST',
+    headers: { 'Content-Type': type },
+    body
+  });
+  if (response.status === 401) {
+    location.reload();
+    throw new Error('登入已過期');
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'HTTP ' + response.status);
+  heroState = data.heroImage;
+  $('heroFile').value = '';
+  renderHero();
+  setStatus('heroStatus', '✓ ' + doneText + '；下次同步（或按「立即同步」）會更新 Discord', 'ok');
+  schedulePreview();
+}
+
+function startHeroCrop() {
   const file = $('heroFile').files[0];
   if (!file) {
     setStatus('heroStatus', '先選一張圖片', 'warn');
     return;
   }
+  openCrop(file);
+}
+
+// ---- hero crop tool ----
+
+async function openCrop(file) {
   if (!HERO_TYPES.includes(file.type)) {
     setStatus('heroStatus', '只接受 PNG、JPEG、WebP 或 GIF 圖片', 'bad');
+    $('heroFile').value = '';
     return;
   }
-  if (file.size > HERO_MAX_BYTES) {
-    setStatus('heroStatus', '圖片太大了，上限是 1.5 MB，請先壓縮或縮小尺寸', 'bad');
-    return;
-  }
-  const button = $('heroUploadBtn');
-  button.disabled = true;
-  setStatus('heroStatus', '上傳中…');
+  let bitmap;
   try {
-    const response = await fetch('/admin/api/hero-image', {
-      method: 'POST',
-      headers: { 'Content-Type': file.type },
-      body: file
-    });
-    if (response.status === 401) {
-      location.reload();
+    // Decoding the file directly keeps object URLs (and a blob: img-src) out of the CSP.
+    bitmap = await createImageBitmap(file);
+  } catch {
+    setStatus('heroStatus', '讀不到這張圖片，換一張試試', 'bad');
+    $('heroFile').value = '';
+    return;
+  }
+  releaseCrop();
+  const baseScale = Math.max(CROP_WIDTH / bitmap.width, CROP_HEIGHT / bitmap.height);
+  crop = { file, bitmap, baseScale, zoom: 1, x: 0, y: 0, drag: null };
+  centerCrop();
+  $('cropZoom').value = '1';
+  $('cropGifHint').classList.toggle('gone', file.type !== 'image/gif');
+  setStatus('cropStatus', '原圖 ' + bitmap.width + '×' + bitmap.height + '，' + formatSize(file.size) + '，輸出 ' +
+    CROP_WIDTH + '×' + CROP_HEIGHT);
+  setCropBusy(false);
+  drawCrop();
+  if (!$('cropDialog').open) $('cropDialog').showModal();
+  $('cropStage').focus();
+}
+
+function releaseCrop() {
+  crop?.bitmap.close();
+  crop = null;
+}
+
+function closeCrop() {
+  releaseCrop();
+  if ($('cropDialog').open) $('cropDialog').close();
+  $('heroFile').value = '';
+}
+
+function cancelCrop() {
+  if ($('cropApplyBtn').disabled) return;
+  closeCrop();
+  setStatus('heroStatus', '已取消，沒有上傳');
+  $('heroFile').focus();
+}
+
+function cropScale() {
+  return crop.baseScale * crop.zoom;
+}
+
+function centerCrop() {
+  crop.x = (CROP_WIDTH - crop.bitmap.width * cropScale()) / 2;
+  crop.y = (CROP_HEIGHT - crop.bitmap.height * cropScale()) / 2;
+}
+
+// The image always covers the whole frame, so the output never has empty edges.
+function clampCrop() {
+  const width = crop.bitmap.width * cropScale();
+  const height = crop.bitmap.height * cropScale();
+  crop.x = Math.min(0, Math.max(CROP_WIDTH - width, crop.x));
+  crop.y = Math.min(0, Math.max(CROP_HEIGHT - height, crop.y));
+}
+
+function paintCrop(ctx) {
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.clearRect(0, 0, CROP_WIDTH, CROP_HEIGHT);
+  ctx.drawImage(crop.bitmap, crop.x, crop.y, crop.bitmap.width * cropScale(), crop.bitmap.height * cropScale());
+}
+
+function drawCrop() {
+  cancelAnimationFrame(cropFrame);
+  cropFrame = requestAnimationFrame(() => {
+    if (crop) paintCrop($('cropCanvas').getContext('2d'));
+  });
+}
+
+// Zooms around a point of the frame (in output pixels), keeping that point still.
+function zoomCrop(zoom, anchorX = CROP_WIDTH / 2, anchorY = CROP_HEIGHT / 2) {
+  if (!crop) return;
+  const next = Math.min(CROP_MAX_ZOOM, Math.max(1, zoom));
+  const ratio = (crop.baseScale * next) / cropScale();
+  crop.x = anchorX - (anchorX - crop.x) * ratio;
+  crop.y = anchorY - (anchorY - crop.y) * ratio;
+  crop.zoom = next;
+  clampCrop();
+  $('cropZoom').value = String(next);
+  drawCrop();
+}
+
+function moveCrop(dx, dy) {
+  crop.x += dx;
+  crop.y += dy;
+  clampCrop();
+  drawCrop();
+}
+
+// Display pixels -> output pixels.
+function stageFactor() {
+  return CROP_WIDTH / $('cropStage').clientWidth;
+}
+
+function stagePoint(event) {
+  const rect = $('cropStage').getBoundingClientRect();
+  return [(event.clientX - rect.left) * stageFactor(), (event.clientY - rect.top) * stageFactor()];
+}
+
+function onCropPointerDown(event) {
+  if (!crop || (event.pointerType === 'mouse' && event.button !== 0)) return;
+  event.preventDefault();
+  $('cropStage').setPointerCapture(event.pointerId);
+  $('cropStage').classList.add('dragging');
+  crop.drag = { id: event.pointerId, clientX: event.clientX, clientY: event.clientY, x: crop.x, y: crop.y };
+}
+
+function onCropPointerMove(event) {
+  const drag = crop?.drag;
+  if (!drag || drag.id !== event.pointerId) return;
+  crop.x = drag.x + (event.clientX - drag.clientX) * stageFactor();
+  crop.y = drag.y + (event.clientY - drag.clientY) * stageFactor();
+  clampCrop();
+  drawCrop();
+}
+
+function onCropPointerUp(event) {
+  if (crop?.drag?.id !== event.pointerId) return;
+  crop.drag = null;
+  $('cropStage').classList.remove('dragging');
+}
+
+function onCropWheel(event) {
+  if (!crop) return;
+  event.preventDefault();
+  const [x, y] = stagePoint(event);
+  zoomCrop(crop.zoom * Math.exp(-event.deltaY * 0.0015), x, y);
+}
+
+function onCropKey(event) {
+  if (!crop) return;
+  const step = event.shiftKey ? 60 : 15;
+  const moves = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] };
+  if (moves[event.key]) {
+    event.preventDefault();
+    moveCrop(...moves[event.key]);
+  } else if (event.key === '+' || event.key === '=') {
+    event.preventDefault();
+    zoomCrop(crop.zoom * 1.1);
+  } else if (event.key === '-' || event.key === '_') {
+    event.preventDefault();
+    zoomCrop(crop.zoom / 1.1);
+  }
+}
+
+function setCropBusy(on) {
+  for (const id of ['cropApplyBtn', 'cropRawBtn', 'cropCancelBtn', 'cropZoom']) {
+    $(id).disabled = on;
+  }
+}
+
+function canvasBlob(canvas, type, quality) {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+}
+
+// PNG first; over the limit, lossy formats in order. A browser that cannot encode a
+// type returns PNG instead, so the blob's own type is checked.
+async function encodeCrop(canvas) {
+  const png = await canvasBlob(canvas, 'image/png');
+  if (png && png.size <= HERO_MAX_BYTES) return png;
+  for (const [type, quality] of CROP_FALLBACKS) {
+    const blob = await canvasBlob(canvas, type, quality);
+    if (blob && blob.type === type && blob.size <= HERO_MAX_BYTES) return blob;
+  }
+  return null;
+}
+
+async function applyCrop() {
+  if (!crop) return;
+  setCropBusy(true);
+  setStatus('cropStatus', '裁切中…');
+  try {
+    const canvas = element('canvas', { width: CROP_WIDTH, height: CROP_HEIGHT });
+    paintCrop(canvas.getContext('2d'));
+    const blob = await encodeCrop(canvas);
+    if (!blob) {
+      setStatus('cropStatus', '裁切後的圖還是超過 1.5 MB，請換一張比較簡單的圖', 'bad');
       return;
     }
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'HTTP ' + response.status);
-    heroState = data.heroImage;
-    $('heroFile').value = '';
-    renderHero();
-    setStatus('heroStatus', '✓ 已上傳；下次同步（或按「立即同步」）會更新 Discord', 'ok');
-    schedulePreview();
+    const summary = IMAGE_FORMAT_NAMES[blob.type] + ' ' + CROP_WIDTH + '×' + CROP_HEIGHT + '，' + formatSize(blob.size);
+    setStatus('cropStatus', '上傳中…（' + summary + '）');
+    await sendHero(blob, blob.type, '已上傳裁切後的圖（' + summary + '）');
+    closeCrop();
   } catch (error) {
-    setStatus('heroStatus', error.message, 'bad');
+    setStatus('cropStatus', error.message, 'bad');
   } finally {
-    button.disabled = false;
+    setCropBusy(false);
+  }
+}
+
+// The original file as before (keeps GIF animation); same type and size checks.
+async function uploadRawHero() {
+  if (!crop) return;
+  const file = crop.file;
+  const problem = checkHeroFile(file);
+  if (problem) {
+    setStatus('cropStatus', problem, 'bad');
+    return;
+  }
+  setCropBusy(true);
+  setStatus('cropStatus', '上傳中…');
+  try {
+    await sendHero(file, file.type, '已上傳原圖（' + IMAGE_FORMAT_NAMES[file.type] + '，' + formatSize(file.size) + '）');
+    closeCrop();
+  } catch (error) {
+    setStatus('cropStatus', error.message, 'bad');
+  } finally {
+    setCropBusy(false);
   }
 }
 
@@ -782,6 +1129,7 @@ async function loadState() {
   metrics = data.metrics;
   fieldMap = data.fields;
   heroState = data.heroImage || heroState;
+  discordClientId = data.discordClientId || null;
   renderStatus(data.status);
   return data;
 }
@@ -817,7 +1165,36 @@ form.addEventListener('change', onSlotChange);
 form.addEventListener('input', onFormChanged);
 form.addEventListener('submit', (event) => { event.preventDefault(); save(true); });
 $('saveBtn').addEventListener('click', () => save(true));
-$('heroUploadBtn').addEventListener('click', uploadHero);
+$('heroUploadBtn').addEventListener('click', startHeroCrop);
+$('heroFile').addEventListener('change', () => {
+  const file = $('heroFile').files[0];
+  if (file) openCrop(file);
+});
+input('heroEditorConfirmed').addEventListener('change', () => {
+  heroStepsOpen = false;
+  renderHero();
+});
+$('heroEditorShowBtn').addEventListener('click', () => {
+  heroStepsOpen = true;
+  renderHero();
+  input('heroEditorConfirmed').focus();
+});
+$('cropStage').addEventListener('pointerdown', onCropPointerDown);
+$('cropStage').addEventListener('pointermove', onCropPointerMove);
+$('cropStage').addEventListener('pointerup', onCropPointerUp);
+$('cropStage').addEventListener('pointercancel', onCropPointerUp);
+$('cropStage').addEventListener('wheel', onCropWheel, { passive: false });
+$('cropStage').addEventListener('keydown', onCropKey);
+$('cropZoom').addEventListener('input', (event) => zoomCrop(Number(event.target.value)));
+$('cropGuidesToggle').addEventListener('change', (event) => $('cropGuides').classList.toggle('gone', !event.target.checked));
+$('cropApplyBtn').addEventListener('click', applyCrop);
+$('cropRawBtn').addEventListener('click', uploadRawHero);
+$('cropCancelBtn').addEventListener('click', cancelCrop);
+// Esc closes the dialog through "cancel"; route it through cancelCrop for cleanup.
+$('cropDialog').addEventListener('cancel', (event) => {
+  event.preventDefault();
+  cancelCrop();
+});
 $('heroDeleteBtn').addEventListener('click', deleteHero);
 $('saveOnlyBtn').addEventListener('click', () => save(false));
 $('resetBtn').addEventListener('click', () => {
