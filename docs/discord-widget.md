@@ -1,53 +1,60 @@
 # Discord Profile Widget
 
+The widget is a card on your Discord profile, built in the Developer Portal's
+widget editor and filled with data by the Worker.
+
+![Profile widget](images/widget.png)
+
 > [!WARNING]
 > Discord ended the custom profile widget experiment on 2026-07-27. New custom
 > widgets can no longer be created, and Discord says existing ones "will no
 > longer be supported". Widgets made during the experiment still update today,
 > but that can stop at any time. Officially, profile widgets are now
 > [Game Stats Widgets](https://docs.discord.com/developers/social-layer/game-stats-widgets/overview),
-> available to developers who have claimed their game on Discord.
+> available to apps with a claimed game.
 >
 > Sources: Discord's
 > [Game Stats Widget Experiment](https://support-dev.discord.com/hc/en-us/articles/42261641635351-Game-Stats-Widget-Experiment)
 > support article and
 > [discord-api-docs discussion #8527](https://github.com/discord/discord-api-docs/discussions/8527).
 
-This page is for you if your Discord application already has a profile widget.
-Everything else in this project (sync, stats, admin page, recap DMs) works
-without one.
+## Setting it up
 
-If you have no widget, turn widget updates off so the Worker does not call the
-widget API every 10 minutes: set `"patchDiscordOnSync": false` in
-[config/app.json](../config/app.json) and deploy again.
+The short version is [Step 7 of the README](../README.md#step-7-set-up-the-profile-widget):
+paste [discord-widget-config.json](discord-widget-config.json) into the editor
+with **⋮** → **Paste config from clipboard**, upload the three images, save,
+and add the widget to your profile.
 
-## How the Worker updates the widget
+![Widget editor](images/widget-editor.png)
 
-Every sync builds a payload and sends it with the bot token to:
+The config uses three application assets. Upload images with these names under
+**Games** → **Assets**, or choose other images in the editor:
 
-```text
-PATCH https://discord.com/api/v9/applications/{DISCORD_CLIENT_ID}/users/{DISCORD_USER_ID}/identities/{DISCORD_IDENTITY_ID}/profile
-```
+| Asset name | Where it shows |
+| --- | --- |
+| `widget_hero` | The large picture on the widget |
+| `widget_preview` | The picture in Discord's **Add Widget** list |
+| `widget_mini` | The picture on your mini profile |
 
-`DISCORD_IDENTITY_ID` defaults to `0`. The payload is only sent when it changed
-since the last sync.
+Discord's own guide to the editor:
+[Widget configuration](https://docs.discord.com/developers/social-layer/game-stats-widgets/widget-configuration).
 
 ## Data Field names
 
-In the widget editor, every field that shows live data uses Value Type
-`User Data` with these names (from [config/widget.json](../config/widget.json)
-`fields`):
+To build the widget by hand instead of pasting the config, give every field
+that shows live data the Value Type `User Data` with these names (from
+[config/widget.json](../config/widget.json) `fields`):
 
-| Field | Shows |
-| --- | --- |
-| `top_hero_title` | Hero title, for example `✦ 4w on Spotify` |
-| `during` | Date range of the stats |
-| `last_updated` | Last sync time |
-| `song` | Last played track, for example `♪ Call of Silence` |
-| `main_title` | Main title, for example `✦ 4w plays: 703` |
+| Surface | Field | Shows |
+| --- | --- | --- |
+| Widget Top | `top_hero_title` | Title, for example `✦ 4w on Spotify` |
+| Widget Top | `during` | Date range of the stats |
+| Widget Top | `last_updated` | Last sync time |
+| Widget Top | `song` | Last played track, for example `♪ Call of Silence` |
+| Mini Profile | `main_title` | Short line, for example `✦ 4w plays: 703` |
 
-The six stats each use a value field and a label field. Set both the stat's
-Value and its Label to Value Type `User Data`:
+The six stats on Widget Bottom each use a value field and a label field. Set
+both the stat's Value and its Label to Value Type `User Data`:
 
 | Stat | Value field | Label field |
 | --- | --- | --- |
@@ -60,8 +67,24 @@ Value and its Label to Value Type `User Data`:
 
 These names are fixed slots. What each slot shows is chosen on the
 [admin page](admin-page.md), so `Songs_Played` may end up holding a top artist.
-Turning on the Label's Fallback in the editor keeps the card readable before
-the first sync.
+Turning on a Label's Fallback in the editor keeps the card readable before the
+first sync.
+
+## How the Worker updates the widget
+
+Every sync builds a payload and sends it with the bot token to:
+
+```text
+PATCH https://discord.com/api/v9/applications/{DISCORD_CLIENT_ID}/users/{DISCORD_USER_ID}/identities/{DISCORD_IDENTITY_ID}/profile
+```
+
+`DISCORD_IDENTITY_ID` defaults to `0`. The payload is only sent when it changed
+since the last sync. If the request fails, the sync still saves your plays and
+the recap DMs still go out; the admin page shows the error as a warning.
+
+If you don't have a widget, turn widget updates off so the Worker stops calling
+the widget API every 10 minutes: set `"patchDiscordOnSync": false` in
+[config/app.json](../config/app.json) and deploy again.
 
 If the widget does not change right away, reload the Discord client
-(`Ctrl+R`).
+(`Ctrl+R`, or `Cmd+R` on macOS).
