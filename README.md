@@ -312,6 +312,14 @@ them. Here slot 3 shows the top artist of all time:
 <img src="docs/images/admin-slots.png" alt="Stat slot editor" width="560">
 <img src="docs/images/admin-preview.png" alt="Live preview of the widget" width="300">
 
+The big image at the top of the widget can be a fixed picture (the
+`widget_hero` asset, the default), an image you upload on the admin page, or
+the album cover of the song you played last. Pick one under **Widget 大圖**.
+If you set up your widget before this option existed, open the widget editor
+and change the hero image to User Data `hero_image` with `widget_hero` as the
+Fallback, or paste [the config](docs/discord-widget-config.json) again.
+Discord may keep showing the old picture for a while.
+
 Every setting and stat is listed in [docs/admin-page.md](docs/admin-page.md).
 
 ## What happens next

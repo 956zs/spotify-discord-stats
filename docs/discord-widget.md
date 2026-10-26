@@ -38,7 +38,7 @@ The config uses three application assets. Upload images with these names under
 
 | Asset name | Where it shows |
 | --- | --- |
-| `widget_hero` | The large picture on the widget |
+| `widget_hero` | The large picture on the widget (fallback when the Worker sends no `hero_image`) |
 | `widget_preview` | The preview picture in Discord's widget picker |
 | `widget_mini` | The picture on your mini profile |
 
@@ -57,6 +57,7 @@ that shows live data the Value Type `User Data` with these names (from
 | Widget Top | `during` | Date range of the stats |
 | Widget Top | `last_updated` | Last sync time |
 | Widget Top | `song` | Last played track, for example `♪ Call of Silence` |
+| Widget Top | `hero_image` | The large picture. Set it to Value Type `User Data`, presentation Image, with a Fallback of Application Asset `widget_hero` |
 | Mini Profile | `main_title` | Short line, for example `✦ 4w plays: 703` |
 
 The six stats on Widget Bottom each use a value field and a label field. Set
@@ -70,6 +71,14 @@ both the stat's Value and its Label to Value Type `User Data`:
 | #4 | `Different_Artists` | `Different_Artists_Label` |
 | #5 | `Different_Albums` | `Different_Albums_Label` |
 | #6 | `Top_Album` | `Top_Album_Label` |
+
+`hero_image` is an image field, not text. The Worker sends it as a media field
+(type 3, `{ "url": "https://..." }`) only when the admin page's **Widget 大圖**
+setting is "custom upload" or "last played album cover" and an image is
+available. Otherwise it sends nothing and Discord shows the `widget_hero`
+fallback. Widgets made from an older copy of the config have `widget_hero` as a
+plain Application Asset; switch the hero image to User Data `hero_image` with
+that Fallback (or paste the config again) to use the new modes.
 
 These names are fixed slots. What each slot shows is chosen on the
 [admin page](admin-page.md), so `Songs_Played` may end up holding a top artist.

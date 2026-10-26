@@ -137,9 +137,14 @@
         "hero_image": {
           "fields": {
             "image": {
-              "value_type": "application_asset",
               "presentation_type": "image",
-              "value": "widget_hero"
+              "value_type": "data",
+              "value": "hero_image",
+              "fallback": {
+                "presentation_type": "image",
+                "value_type": "application_asset",
+                "value": "widget_hero"
+              }
             }
           }
         },

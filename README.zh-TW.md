@@ -270,6 +270,11 @@ admin 頁可以設定統計區間（7、28、90、365 天、自訂天數或全�
 <img src="docs/images/admin-slots.png" alt="統計格編輯器" width="560">
 <img src="docs/images/admin-preview.png" alt="widget 即時預覽" width="300">
 
+widget 最上面的大圖可以在 **Widget 大圖** 選：固定素材（`widget_hero`，預設）、
+在 admin 頁上傳的圖片，或最近播放那首歌的專輯封面。如果你的 widget 是在這個選項出現之前做的，
+要到 widget 編輯器把大圖改成 User Data `hero_image`，Fallback 選 `widget_hero`，
+或重新貼一次 [設定檔](docs/discord-widget-config.json)。Discord 可能會快取舊圖一陣子。
+
 所有設定和統計項目都列在 [docs/admin-page.md](docs/admin-page.md)（英文）。
 
 ## 設定完之後

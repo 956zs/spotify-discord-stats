@@ -12,6 +12,24 @@ The page interface is in Traditional Chinese.
 - Global stats range: 7 / 28 / 90 / 365 days, a custom number of days, or all
   time.
 - Widget copy: username, hero title, main title, last-updated prefix.
+- Widget 大圖 (the big Widget Top image, field `hero_image`):
+  - 固定素材 (fixed asset, default): sends nothing, Discord shows the
+    `widget_hero` fallback asset.
+  - 自訂上傳 (custom upload): upload a PNG, JPEG, WebP or GIF (max 1.5 MB,
+    1300×1200 fits the template) on the page. The widget points at
+    `PUBLIC_BASE_URL/widget/hero?v=<hash>`, so a new upload changes the URL and
+    skips Discord's cache. With no image uploaded, or no `PUBLIC_BASE_URL` /
+    `SPOTIFY_REDIRECT_URI` to build a public URL, it falls back to the asset.
+  - 最近播放的專輯封面 (last played album cover): the Spotify album artwork
+    of the last played song. Falls back to the asset when that play has no
+    artwork (for example imported history).
+
+  The mode is saved with the other settings; upload and delete take effect
+  immediately. The widget editor must use User Data `hero_image` with a
+  Fallback, see [discord-widget.md](discord-widget.md#data-field-names).
+  The Node/VPS runtime has no admin page or image store: it reads the mode
+  from `heroImage` in `config/widget.json`, supports `album`, and treats
+  `upload` as `asset`.
 - Six stat slots. Each slot picks a metric, a range (follow global, a fixed
   number of days, or all time), a label, and a value format. Slots can be
   reordered.
@@ -53,7 +71,8 @@ Only the queries the chosen slots need are run, once per distinct range.
 Results are cached per range and reused until a newer play arrives, the hour
 changes, or the slot selection changes. After importing older history, press
 the sync button to refresh the cached numbers. The "new artists" metric needs
-migration `0004`.
+migration `0004`. Uploaded hero images live in the `widget_images` table from
+migration `0005`.
 
 ## Admin routes
 
@@ -70,3 +89,28 @@ POST /admin/recap/monthly/send     send last month's recap DM now (add &month=20
 ```
 
 The recap routes send real Discord DMs; they are not previews.
+
+The page itself uses these JSON routes (signed-in session, same-origin only):
+
+```text
+GET  /admin/api/state              settings, defaults, preview payload, hero image info
+POST /admin/api/preview            preview payload for unsaved settings
+POST /admin/api/settings           save settings
+POST /admin/api/push               sync and push to Discord now
+POST /admin/api/hero-image         upload the hero image (raw body, Content-Type image/png|jpeg|webp|gif, max 1.5 MB)
+POST /admin/api/hero-image/delete  delete the uploaded hero image
+```
+
+Uploads are checked against the file's magic bytes, so only real PNG, JPEG,
+WebP and GIF files are stored.
+
+## Public routes
+
+```text
+GET  /widget/hero                  the uploaded hero image, no sign-in (Discord fetches it)
+GET  /health                       health check
+```
+
+`/widget/hero` returns the stored Content-Type with
+`Cache-Control: public, max-age=31536000, immutable` and an ETag, or 404 when
+nothing is uploaded.
