@@ -52,7 +52,7 @@ ${scriptTag}
           "default-src 'none'",
           `script-src 'nonce-${nonce}'`,
           `style-src 'nonce-${nonce}'`,
-          "img-src 'self' https://i.scdn.co",
+          "img-src 'self' https://i.scdn.co https://*.scdn.co https://*.spotifycdn.com",
           "connect-src 'self'",
           "form-action 'self'",
           "base-uri 'none'",
@@ -100,6 +100,13 @@ button:disabled { opacity:.4; cursor:default; }
 .sticky { position:sticky; top:16px; }
 .card { background:#232428; border-radius:8px; overflow:hidden; transition:opacity .15s; }
 .card.loading { opacity:.45; }
+.card-hero-img { display:block; width:100%; aspect-ratio:13 / 12; object-fit:cover; background:var(--bg); }
+.hero-modes { display:flex; flex-wrap:wrap; gap:6px 18px; margin-bottom:10px; }
+.hero-modes .check { margin:0; }
+.hero-upload { display:grid; grid-template-columns:120px minmax(0,1fr); gap:12px; align-items:start; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--raised); margin-bottom:10px; }
+.hero-thumb { width:120px; aspect-ratio:13 / 12; border-radius:6px; background:var(--bg); border:1px dashed var(--line); display:grid; place-items:center; color:var(--muted); font-size:11px; overflow:hidden; }
+.hero-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.hero-upload input[type=file] { margin:0 0 8px; padding:5px; }
 .card-top { padding:14px; border-bottom:1px solid var(--line); }
 .card-user { font-size:11px; color:var(--muted); }
 .card-hero { font-size:17px; font-weight:600; margin:6px 0 2px; }
@@ -146,6 +153,7 @@ dt { color:var(--muted); } dd { margin:0; }
   .slot-text .spacer { grid-row:1 / 3; }
   .slot-label, .slot-value { grid-column:2; }
   .kbd { display:none; }
+  .hero-upload { grid-template-columns:1fr; }
 }
 `;
 
@@ -190,6 +198,27 @@ const ADMIN_BODY = `<main>
           <label>主標題（main_title）<input name="mainTitle" maxlength="256"></label>
         </section>
         <section>
+          <h2>Widget 大圖</h2>
+          <p class="hint">Widget Top 最上面的大圖（hero_image）。建議 1300×1200 的圖。Discord 可能會快取圖片，換圖後要等一下才會看到。</p>
+          <div class="hero-modes">
+            <label class="check"><input type="radio" name="heroImage" value="asset"> 固定素材</label>
+            <label class="check"><input type="radio" name="heroImage" value="upload"> 自訂上傳</label>
+            <label class="check"><input type="radio" name="heroImage" value="album"> 最近播放的專輯封面</label>
+          </div>
+          <div id="heroUploadBox" class="hero-upload gone">
+            <div class="hero-thumb" id="heroThumb">尚未上傳</div>
+            <div>
+              <input type="file" id="heroFile" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="選擇圖片">
+              <div class="actions">
+                <button type="button" id="heroUploadBtn">上傳</button>
+                <button type="button" id="heroDeleteBtn">刪除</button>
+              </div>
+              <p class="hint spaced" id="heroMeta">PNG、JPEG、WebP 或 GIF，最大 1.5 MB。上傳和刪除會立即生效。</p>
+            </div>
+          </div>
+          <div id="heroStatus" class="status"></div>
+        </section>
+        <section>
           <h2>統計格</h2>
           <p class="hint">統計格內的變數套用該格自己的區間。換統計項目時，若標籤還是預設文字會自動換成新的預設標籤。點預覽裡的格子可以跳到對應設定。</p>
           <div class="slot-head"><span>#</span><span>統計項目</span><span>區間</span><span></span></div>
@@ -201,6 +230,7 @@ const ADMIN_BODY = `<main>
       <section>
         <h2>預覽</h2>
         <div class="card" id="pCard">
+          <img class="card-hero-img gone" id="pHeroImg" alt="Widget 大圖">
           <div class="card-top">
             <div class="card-user" id="pUser"></div>
             <div class="card-hero" id="pHero"></div>
@@ -241,6 +271,9 @@ const ADMIN_BODY = `<main>
 
 const ADMIN_SCRIPT = `
 const PRESET_DAYS = ['7', '28', '90', '365'];
+const HERO_PATH = '/widget/hero';
+const HERO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const HERO_MAX_BYTES = 1.5 * 1024 * 1024;
 const SLOT_RANGES = [
   ['global', '跟隨全域'], ['7', '7 天'], ['28', '28 天'], ['90', '90 天'], ['180', '180 天'],
   ['365', '365 天'], ['all', '全部歷史'], ['custom', '自訂天數']
@@ -249,6 +282,8 @@ const form = document.getElementById('settings');
 let defaults = null;
 let metrics = [];
 let fieldMap = null;
+let heroState = { upload: null, publicBaseUrl: null };
+let lastPayload = null;
 let savedSnapshot = null;
 let previewTimer = null;
 let previewSeq = 0;
@@ -300,6 +335,7 @@ function fillForm(settings) {
     input('customDays').value = days;
   }
   input('recapEnabled').checked = settings.recapEnabled;
+  input('heroImage').value = settings.widget.heroImage || 'asset';
   for (const name of ['username', 'topHeroTitle', 'mainTitle', 'lastUpdatedPrefix']) {
     input(name).value = settings.widget[name];
   }
@@ -317,6 +353,7 @@ function readForm() {
       topHeroTitle: input('topHeroTitle').value,
       mainTitle: input('mainTitle').value,
       lastUpdatedPrefix: input('lastUpdatedPrefix').value,
+      heroImage: input('heroImage').value || 'asset',
       slots: readSlots()
     }
   };
@@ -324,6 +361,113 @@ function readForm() {
 
 function toggleCustomDays() {
   $('customDaysWrap').classList.toggle('hidden', input('rangeChoice').value !== 'custom');
+}
+
+// ---- hero image ----
+
+// The payload points at the public URL (PUBLIC_BASE_URL); the preview loads the same
+// file from this origin so it also works on wrangler dev.
+function heroPreviewSrc(url) {
+  try {
+    const parsed = new URL(url, location.origin);
+    return parsed.pathname === HERO_PATH ? parsed.pathname + parsed.search : parsed.href;
+  } catch {
+    return '';
+  }
+}
+
+function heroFieldUrl(payload, map) {
+  const field = payload?.data?.dynamic?.find((entry) => entry.name === map?.heroImage && entry.type === 3);
+  return field?.value?.url || '';
+}
+
+function renderHero() {
+  const mode = input('heroImage').value || 'asset';
+  $('heroUploadBox').classList.toggle('gone', mode !== 'upload');
+  const upload = heroState.upload;
+  const thumb = $('heroThumb');
+  if (upload) {
+    thumb.replaceChildren(element('img', { src: upload.url, alt: '目前的大圖' }));
+    $('heroMeta').textContent = upload.contentType + '，' + (upload.size / 1024).toFixed(0) + ' KB，更新於 ' +
+      new Date(upload.updatedAt).toLocaleString();
+  } else {
+    thumb.replaceChildren('尚未上傳');
+    $('heroMeta').textContent = 'PNG、JPEG、WebP 或 GIF，最大 1.5 MB。上傳和刪除會立即生效。';
+  }
+  $('heroDeleteBtn').disabled = !upload;
+
+  const hasImage = Boolean(heroFieldUrl(lastPayload, fieldMap));
+  let text = '';
+  if (mode === 'upload' && !heroState.publicBaseUrl) {
+    text = '沒有設定 PUBLIC_BASE_URL，Discord 抓不到上傳的圖，會顯示固定素材';
+  } else if (mode === 'upload' && !upload) {
+    text = '還沒上傳圖片，目前會顯示固定素材';
+  } else if (mode === 'album' && lastPayload && !hasImage) {
+    text = '最近播放的歌沒有專輯封面，目前會顯示固定素材';
+  }
+  // Keep a fresh upload/delete result; only replace an earlier warning.
+  if (text) {
+    setStatus('heroStatus', text, 'warn');
+  } else if ($('heroStatus').classList.contains('warn')) {
+    setStatus('heroStatus', '');
+  }
+}
+
+async function uploadHero() {
+  const file = $('heroFile').files[0];
+  if (!file) {
+    setStatus('heroStatus', '先選一張圖片', 'warn');
+    return;
+  }
+  if (!HERO_TYPES.includes(file.type)) {
+    setStatus('heroStatus', '只接受 PNG、JPEG、WebP 或 GIF 圖片', 'bad');
+    return;
+  }
+  if (file.size > HERO_MAX_BYTES) {
+    setStatus('heroStatus', '圖片太大了，上限是 1.5 MB，請先壓縮或縮小尺寸', 'bad');
+    return;
+  }
+  const button = $('heroUploadBtn');
+  button.disabled = true;
+  setStatus('heroStatus', '上傳中…');
+  try {
+    const response = await fetch('/admin/api/hero-image', {
+      method: 'POST',
+      headers: { 'Content-Type': file.type },
+      body: file
+    });
+    if (response.status === 401) {
+      location.reload();
+      return;
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'HTTP ' + response.status);
+    heroState = data.heroImage;
+    $('heroFile').value = '';
+    renderHero();
+    setStatus('heroStatus', '✓ 已上傳；下次同步（或按「立即同步」）會更新 Discord', 'ok');
+    schedulePreview();
+  } catch (error) {
+    setStatus('heroStatus', error.message, 'bad');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function deleteHero() {
+  if (!confirm('要刪除上傳的大圖嗎？刪除後會顯示固定素材。')) return;
+  const button = $('heroDeleteBtn');
+  button.disabled = true;
+  try {
+    const data = await api('/admin/api/hero-image/delete', {});
+    heroState = data.heroImage;
+    renderHero();
+    setStatus('heroStatus', '✓ 已刪除', 'ok');
+    schedulePreview();
+  } catch (error) {
+    setStatus('heroStatus', error.message, 'bad');
+    button.disabled = !heroState.upload;
+  }
 }
 
 // ---- slots ----
@@ -471,6 +615,16 @@ function flash(el) {
 // ---- preview ----
 
 function renderPreview(payload, map) {
+  lastPayload = payload;
+  const heroUrl = heroFieldUrl(payload, map);
+  const heroImg = $('pHeroImg');
+  heroImg.classList.toggle('gone', !heroUrl);
+  if (heroUrl) {
+    heroImg.src = heroPreviewSrc(heroUrl);
+  } else {
+    heroImg.removeAttribute('src');
+  }
+  renderHero();
   const fields = Object.fromEntries(payload.data.dynamic.map((field) => [field.name, field.value]));
   $('pUser').textContent = payload.username;
   $('pHero').textContent = fields[map.topHeroTitle];
@@ -529,6 +683,7 @@ function markSaved() {
 
 function onFormChanged() {
   toggleCustomDays();
+  renderHero();
   schedulePreview();
   if (!busy) {
     setStatus('saveStatus', isDirty() ? '● 有未儲存的變更' : '已是最新', isDirty() ? 'warn' : '');
@@ -622,6 +777,7 @@ async function loadState() {
   defaults = data.defaults;
   metrics = data.metrics;
   fieldMap = data.fields;
+  heroState = data.heroImage || heroState;
   renderStatus(data.status);
   return data;
 }
@@ -630,7 +786,7 @@ async function loadState() {
 
 document.addEventListener('focusin', (event) => {
   const el = event.target;
-  if (el.tagName === 'INPUT' && el.type !== 'number' && el.type !== 'checkbox' && form.contains(el)) {
+  if (el.tagName === 'INPUT' && el.type === 'text' && form.contains(el)) {
     lastTextInput = el;
   }
 });
@@ -657,6 +813,8 @@ form.addEventListener('change', onSlotChange);
 form.addEventListener('input', onFormChanged);
 form.addEventListener('submit', (event) => { event.preventDefault(); save(true); });
 $('saveBtn').addEventListener('click', () => save(true));
+$('heroUploadBtn').addEventListener('click', uploadHero);
+$('heroDeleteBtn').addEventListener('click', deleteHero);
 $('saveOnlyBtn').addEventListener('click', () => save(false));
 $('resetBtn').addEventListener('click', () => {
   fillForm(defaults);

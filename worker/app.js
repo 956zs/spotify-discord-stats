@@ -1,5 +1,6 @@
 import { appConfig, widgetConfig } from './config.js';
 import { MS_PER_DAY } from '../shared/time.js';
+import { HERO_IMAGE_PATH } from '../shared/widget-hero.js';
 import { metricCatalog } from '../shared/widget-metrics.js';
 import {
   checkAdminToken,
@@ -11,6 +12,7 @@ import {
   requireSameOriginJson
 } from './lib/admin-auth.js';
 import { adminPageResponse, loginPageResponse } from './lib/admin-page.js';
+import { publicBaseUrl } from './lib/env.js';
 import { HttpError, json } from './lib/http.js';
 import { startSpotifyLogin, handleSpotifyCallback } from './lib/oauth.js';
 import { runDueRecapReports, sendMonthlyRecap, sendWeeklyRecap } from './lib/recap-delivery.js';
@@ -21,12 +23,28 @@ import { getState } from './lib/state.js';
 import { syncOnce } from './lib/sync.js';
 import { getStats, getStatsRanges, getWidgetData } from './lib/stats.js';
 import { buildWidgetPayload } from './lib/widget.js';
+import {
+  HERO_IMAGE_KEY,
+  deleteWidgetImage,
+  getWidgetImageMeta,
+  readImageUpload,
+  saveWidgetImage,
+  widgetImageResponse
+} from './lib/widget-images.js';
 
 export async function handleRequest(request, env) {
   const url = new URL(request.url);
 
   if (url.pathname === '/health') {
     return json({ ok: true });
+  }
+
+  // Public: Discord's media proxy fetches the uploaded hero image from here.
+  if (url.pathname === HERO_IMAGE_PATH) {
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      throw new HttpError('method not allowed', 405);
+    }
+    return widgetImageResponse(env.DB, HERO_IMAGE_KEY, request);
   }
 
   if (url.pathname === '/spotify/login') {
@@ -125,24 +143,40 @@ async function handleLogin(request, url, env) {
 async function handleAdminApi(request, url, env) {
   if (url.pathname === '/admin/api/state' && request.method === 'GET') {
     const settings = await loadSettings(env.DB);
-    const data = await getWidgetData(env.DB, settings);
+    const data = await getWidgetData(env.DB, settings, { publicBaseUrl: publicBaseUrl(env) });
     return json({
       settings,
       defaults: getDefaultSettings(),
       payload: buildWidgetPayload(data, settings),
       fields: widgetConfig.fields,
       metrics: metricCatalog(),
+      heroImage: await heroImageState(env),
       status: await adminStatus(env)
     });
   }
 
   requirePost(request);
+
+  // Raw image body, so it skips the JSON-only guard but keeps the same-origin checks.
+  // An image Content-Type is not CORS-safelisted, so cross-site pages also need a preflight.
+  if (url.pathname === '/admin/api/hero-image') {
+    requireSameOrigin(request, url);
+    const image = await readImageUpload(request);
+    await saveWidgetImage(env.DB, HERO_IMAGE_KEY, image);
+    return json({ heroImage: await heroImageState(env) });
+  }
+
   requireSameOriginJson(request, url);
   const body = await readJson(request);
 
+  if (url.pathname === '/admin/api/hero-image/delete') {
+    const { deleted } = await deleteWidgetImage(env.DB, HERO_IMAGE_KEY);
+    return json({ deleted, heroImage: await heroImageState(env) });
+  }
+
   if (url.pathname === '/admin/api/preview') {
     const settings = parseSettingsInput(body.settings);
-    const data = await getWidgetData(env.DB, settings);
+    const data = await getWidgetData(env.DB, settings, { publicBaseUrl: publicBaseUrl(env) });
     return json({ payload: buildWidgetPayload(data, settings), fields: widgetConfig.fields });
   }
 
@@ -155,6 +189,13 @@ async function handleAdminApi(request, url, env) {
   }
 
   return json({ error: 'not found' }, 404);
+}
+
+async function heroImageState(env) {
+  return {
+    upload: await getWidgetImageMeta(env.DB, HERO_IMAGE_KEY),
+    publicBaseUrl: publicBaseUrl(env)
+  };
 }
 
 async function adminStatus(env) {
