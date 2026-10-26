@@ -371,7 +371,8 @@ it has less detail. To undo an import, see
 <summary><b>I can't find Create app on the Spotify Developer Dashboard</b></summary>
 
 - **No Premium.** Since February 2026, free Spotify accounts can't create
-  developer apps.
+  developer apps. The dashboard then only says "You haven't created any apps
+  yet", with no button at all.
 - **Email not verified.** The dashboard says "You need to verify your email
   address before you can create an app". Verify the email on your Spotify
   account. If you sign in with Google, Facebook, or Apple, you may not get the
@@ -381,6 +382,13 @@ it has less detail. To undo an import, see
   You can reuse an app you already have: add this project's Redirect URI to it.
 - Some Premium accounts still don't see the button; that is on Spotify's side.
   Ask on the [Spotify for Developers forum](https://community.spotify.com/t5/Spotify-for-Developers/bd-p/Spotify_Developer).
+
+**Workaround without Premium:** Spotify only requires the app's owner to have
+Premium. A friend with Premium can add your Spotify email to their app under
+**User Management** (up to 5 users per app), add your Worker's
+`/spotify/callback` URL to its Redirect URIs, and give you the app's Client ID
+and Client Secret. Only do this with people you trust: whoever has the Client
+Secret can act as that app.
 </details>
 
 <details>

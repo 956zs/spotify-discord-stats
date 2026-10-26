@@ -320,6 +320,7 @@ Spotify 可以把你所有的播放紀錄寄給你：
 <summary><b>在 Spotify Developer Dashboard 找不到 Create app</b></summary>
 
 - **不是 Premium。** 從 2026 年 2 月起，免費的 Spotify 帳號不能建立開發者 app。
+  這時頁面只會寫「You haven't created any apps yet」，完全沒有按鈕。
 - **email 還沒驗證。** 頁面上會寫「You need to verify your email address before you can create an app」。
   請先驗證 Spotify 帳號的 email。如果你是用 Google、Facebook 或 Apple 登入，可能收不到驗證信，
   要先到[登入方式](https://www.spotify.com/account/login-methods/)加一個「email 和密碼」的登入方式。
@@ -327,6 +328,11 @@ Spotify 可以把你所有的播放紀錄寄給你：
   把這個專案的 Redirect URI 加進去就好。
 - 有些 Premium 帳號還是看不到這個按鈕，這是 Spotify 那邊的問題，可以到
   [Spotify for Developers 論壇](https://community.spotify.com/t5/Spotify-for-Developers/bd-p/Spotify_Developer)詢問。
+
+**沒有 Premium 的變通方法**：Spotify 只要求 app 的擁有者有 Premium。有 Premium 的朋友可以在他的 app 的
+**User Management** 加入你的 Spotify email（每個 app 最多 5 人），在 Redirect URIs 加上你的 Worker 網址加
+`/spotify/callback`，再把 app 的 Client ID 和 Client Secret 給你。只跟信得過的人這樣做：
+拿到 Client Secret 的人就能以那個 app 的身分操作。
 </details>
 
 <details>
