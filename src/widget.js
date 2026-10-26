@@ -7,6 +7,8 @@ import { buildWidgetPayload as buildPayload, collectWidgetData } from '../shared
 import { defaultSettings } from '../shared/widget-settings.js';
 
 // The Node runtime has no admin page, so its settings are the config file defaults.
+// It also cannot store or serve an uploaded hero image, so heroImage "upload" acts like
+// "asset" here; "album" works because lastPlayed carries the album artwork.
 export function getWidgetSettings() {
   return defaultSettings(appConfig, widgetConfig);
 }

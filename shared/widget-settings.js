@@ -1,3 +1,4 @@
+import { normalizeHeroMode } from './widget-hero.js';
 import { isMetricId } from './widget-metrics.js';
 
 // Editable settings live in two layers: config/*.json supplies defaults at build time,
@@ -22,6 +23,7 @@ export function defaultSettings(appConfig, widgetConfig) {
       topHeroTitle: widgetConfig.topHeroTitle,
       mainTitle: widgetConfig.mainTitle,
       lastUpdatedPrefix: widgetConfig.lastUpdatedPrefix,
+      heroImage: normalizeHeroMode(widgetConfig.heroImage),
       slots: widgetConfig.slots.map((slot) => ({
         metric: slot.metric,
         range: slot.range ?? GLOBAL_RANGE,
@@ -74,6 +76,8 @@ export function validateSettings(input, slotCount) {
       topHeroTitle: text(widgetInput.topHeroTitle, 'widget.topHeroTitle', errors),
       mainTitle: text(widgetInput.mainTitle, 'widget.mainTitle', errors),
       lastUpdatedPrefix: text(widgetInput.lastUpdatedPrefix, 'widget.lastUpdatedPrefix', errors),
+      // A missing or unknown hero mode falls back to the fixed asset instead of failing.
+      heroImage: normalizeHeroMode(widgetInput.heroImage),
       slots: slots(widgetInput.slots, slotCount, errors)
     }
   };

@@ -1,4 +1,5 @@
 import { appConfig } from '../config.js';
+import { publicBaseUrl } from './env.js';
 import { loadSettings } from './settings.js';
 import { syncRecentlyPlayed } from './spotify.js';
 import { getStatsRanges, getWidgetData } from './stats.js';
@@ -8,7 +9,10 @@ export async function syncOnce(env, options = {}) {
   const settings = await loadSettings(env.DB);
   const recentlyPlayed = await syncRecentlyPlayed(env);
   const genres = { updated: 0, skipped: true, reason: 'top_album_replaces_genre' };
-  const data = await getWidgetData(env.DB, settings, { refresh: options.refreshStats });
+  const data = await getWidgetData(env.DB, settings, {
+    refresh: options.refreshStats,
+    publicBaseUrl: publicBaseUrl(env)
+  });
   const widget = buildWidgetPayload(data, settings);
 
   let discord = { patched: false, skipped: true, reason: 'disabled' };

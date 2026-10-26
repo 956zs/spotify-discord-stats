@@ -7,8 +7,10 @@ import {
   resolveSince,
   runMetricQueries
 } from '../../shared/widget-metrics-query.js';
+import { HERO_UPLOAD } from '../../shared/widget-hero.js';
 import { isAllTime } from '../../shared/widget-settings.js';
 import { getState, setState } from './state.js';
+import { HERO_IMAGE_KEY, getWidgetImageMeta } from './widget-images.js';
 
 const CACHE_KEY_PREFIX = 'widget_metrics_cache:';
 
@@ -16,13 +18,18 @@ const CACHE_KEY_PREFIX = 'widget_metrics_cache:';
 // while the newest play, the hour-floored window start, and the query set are all
 // unchanged, so idle cron ticks skip the window scans entirely. `refresh` forces a
 // recompute, e.g. after importing older history (which leaves the newest play as is).
+// `publicBaseUrl` is where /widget/hero is reachable; without it "upload" acts like "asset".
 export async function getWidgetData(db, settings, options = {}) {
   const now = options.now ?? new Date();
   const latestPlayedAtMs = await getLatestPlayedAtMs(db);
+  const heroUpload =
+    settings.widget.heroImage === HERO_UPLOAD ? await getWidgetImageMeta(db, HERO_IMAGE_KEY) : null;
 
   return collectWidgetData(db, settings, {
     now,
     lastPlayed: await getLastPlayedSong(db),
+    heroUpload,
+    publicBaseUrl: options.publicBaseUrl,
     loadRange: async (days, queryIds) => {
       const since = await resolveSince(db, days, now);
       const fingerprint = `${latestPlayedAtMs}|${since}|${queryIds.join(',')}`;

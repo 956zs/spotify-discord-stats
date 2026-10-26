@@ -1,4 +1,5 @@
 import { formatCount } from './number.js';
+import { resolveHeroImageUrl } from './widget-hero.js';
 import { formatDateRange, formatLocalUpdatedAt } from './time.js';
 import { formatMetric, metricQueries } from './widget-metrics.js';
 import { rangeKey, resolveSince, runMetricQueries } from './widget-metrics-query.js';
@@ -27,6 +28,8 @@ export function planWidgetQueries(settings) {
 
 // `loadRange(days, queryIds)` returns { since, results } for one range; runtimes pass a
 // cached version. `lastPlayed` is the song status shown in the `song` field.
+// `heroUpload` ({ sha256 } of the uploaded hero image) and `publicBaseUrl` are only
+// passed by runtimes that serve the upload; without them "upload" acts like "asset".
 export async function collectWidgetData(db, settings, options) {
   const now = options.now ?? new Date();
   const loadRange = options.loadRange ?? (async (days, queryIds) => {
@@ -38,7 +41,13 @@ export async function collectWidgetData(db, settings, options) {
   for (const [key, { days, queryIds }] of planWidgetQueries(settings)) {
     ranges[key] = { days, ...(await loadRange(days, [...queryIds].sort())) };
   }
-  return { ranges, lastPlayed: options.lastPlayed, now };
+  return {
+    ranges,
+    lastPlayed: options.lastPlayed,
+    heroUpload: options.heroUpload ?? null,
+    publicBaseUrl: options.publicBaseUrl ?? null,
+    now
+  };
 }
 
 export function buildWidgetPayload(data, settings, fields, now = data.now ?? new Date()) {
@@ -69,6 +78,11 @@ export function buildWidgetPayload(data, settings, fields, now = data.now ?? new
     dynamic.push(widgetField(slotFields.label, renderTemplate(slot.label, slotVars)));
   });
 
+  const heroUrl = resolveHeroImageUrl(widget.heroImage, data);
+  if (heroUrl) {
+    dynamic.push(mediaField(fields.heroImage, heroUrl));
+  }
+
   return {
     username: widget.username,
     data: { dynamic }
@@ -83,9 +97,21 @@ function rangeVars(range) {
   };
 }
 
+// Discord dynamic field types: 1 = string, 3 = media ({ url }).
+const STRING_FIELD = 1;
+const MEDIA_FIELD = 3;
+
 function widgetField(name, value) {
+  return { type: STRING_FIELD, name: requireFieldName(name), value };
+}
+
+function mediaField(name, url) {
+  return { type: MEDIA_FIELD, name: requireFieldName(name), value: { url } };
+}
+
+function requireFieldName(name) {
   if (!name) {
     throw new Error('Widget field name is missing. Check config/widget.json.');
   }
-  return { type: 1, name, value };
+  return name;
 }

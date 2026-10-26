@@ -3,6 +3,7 @@
   "topHeroTitle": "✦ {range} on Spotify🧋",
   "lastUpdatedPrefix": "last updated: ",
   "mainTitle": "✦ {range} plays: {count}",
+  "heroImage": "asset",
   "slots": [
     {
       "metric": "songsPlayed",
@@ -47,6 +48,7 @@
     "lastUpdated": "last_updated",
     "song": "song",
     "mainTitle": "main_title",
+    "heroImage": "hero_image",
     "slots": [
       {
         "value": "Songs_Played",
