@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
-import { runWrangler } from './wrangler.js';
+import { runWrangler, runWranglerJson } from './wrangler.js';
+import { describeImportCutoff, FIRST_SYNCED_PLAY_SQL, resolveImportCutoff } from '../shared/import-cutoff.js';
 import { exportRowToPlayRecords } from '../shared/play-records.js';
 
 const CHUNK_INDEX_PAD_WIDTH = 4;
@@ -14,6 +15,10 @@ if (options.targets.length === 0) {
   usage();
   process.exit(1);
 }
+
+const cutoff = resolveImportCutoff(options, options.before || options.noCutoff ? null : queryFirstSyncedPlay());
+options.before = cutoff.before;
+console.log(describeImportCutoff(cutoff));
 
 const jsonFiles = options.targets.flatMap((target) => findJsonFiles(path.resolve(target)));
 if (jsonFiles.length === 0) {
@@ -81,6 +86,13 @@ function executeChunk() {
   }
 
   runWrangler(['d1', 'execute', options.dbName, options.remote ? '--remote' : '--local', '--yes', '--file', filePath]);
+}
+
+function queryFirstSyncedPlay() {
+  const output = runWranglerJson([
+    'd1', 'execute', options.dbName, options.remote ? '--remote' : '--local', '--command', FIRST_SYNCED_PLAY_SQL
+  ]);
+  return output[0]?.results?.[0]?.first_synced ?? null;
 }
 
 function exportRowToSql(row) {
@@ -164,6 +176,7 @@ function parseArgs(args) {
     batchSize: DEFAULT_BATCH_SIZE,
     after: null,
     before: null,
+    noCutoff: false,
     targets: []
   };
 
@@ -183,6 +196,8 @@ function parseArgs(args) {
       parsed.after = parseBoundary('--after', args[++index]);
     } else if (arg === '--before') {
       parsed.before = parseBoundary('--before', args[++index]);
+    } else if (arg === '--no-cutoff') {
+      parsed.noCutoff = true;
     } else {
       parsed.targets.push(arg);
     }
@@ -233,11 +248,15 @@ function sqlNumber(value) {
 
 function usage() {
   console.error(`Usage:
-  npm run cf:import -- [--local|--remote] [--db spotify-discord-stats] /path/to/export
+  npm run cf:import -- [--local|--remote] [--db spotify-discord-stats] [--dry-run]
+    [--after ISO_DATE] [--before ISO_DATE | --no-cutoff] /path/to/export
+
+By default only plays before the first play synced from Spotify are imported,
+so the overlap with synced plays is not counted twice.
 
 Examples:
   npm run cf:import -- --local ~/Downloads/SpotifyData
   npm run cf:import -- --remote ~/Downloads/SpotifyData
-  npm run cf:import -- --remote --before 2026-07-05T00:00:00Z ~/Downloads/SpotifyData
+  npm run cf:import -- --remote --before 2026-01-15T00:00:00Z ~/Downloads/SpotifyData
   npm run cf:import -- --dry-run ~/Downloads/SpotifyData`);
 }

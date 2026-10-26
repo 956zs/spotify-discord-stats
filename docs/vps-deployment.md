@@ -179,7 +179,9 @@ npm run spotify:import -- /path/to/extracted/spotify/export
 ```
 
 The importer supports one-year account streaming history and extended streaming
-history. It deduplicates overlap by `played_at + track_key`.
+history. By default it only imports plays from before your first API-synced
+play, so the overlap is not counted twice (`--before` and `--no-cutoff`
+override this).
 
 ## SQLite Backup
 

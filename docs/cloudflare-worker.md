@@ -176,5 +176,6 @@ npm run cf:d1:migrate:local
 npm run cf:import -- --local /path/to/extracted/spotify/export
 ```
 
-The importer deduplicates overlap with API-synced plays by `played_at + track_id`
-and uses export `ms_played` to improve listening-time accuracy.
+By default the importer only imports plays from before your first API-synced
+play, so the overlap is not counted twice (`--before` and `--no-cutoff`
+override this). It uses export `ms_played` to improve listening-time accuracy.

@@ -1,14 +1,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { describeImportCutoff, FIRST_SYNCED_PLAY_SQL, resolveImportCutoff } from '../shared/import-cutoff.js';
 import { exportRowToPlayRecords } from '../shared/play-records.js';
-import { upsertExportPlay } from './db.js';
+import { getDb, upsertExportPlay } from './db.js';
 
 const options = parseArgs(process.argv.slice(2));
 if (options.targets.length === 0) {
   usage();
   process.exit(1);
 }
+
+const cutoff = resolveImportCutoff(
+  options,
+  options.before || options.noCutoff ? null : getDb().prepare(FIRST_SYNCED_PLAY_SQL).get()?.first_synced
+);
+options.before = cutoff.before;
+console.log(describeImportCutoff(cutoff));
 
 let files = [];
 for (const target of options.targets) {
@@ -73,13 +81,15 @@ function isImportable(row) {
 }
 
 function parseArgs(args) {
-  const parsed = { after: null, before: null, targets: [] };
+  const parsed = { after: null, before: null, noCutoff: false, targets: [] };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === '--after') {
       parsed.after = parseBoundary('--after', args[++index]);
     } else if (arg === '--before') {
       parsed.before = parseBoundary('--before', args[++index]);
+    } else if (arg === '--no-cutoff') {
+      parsed.noCutoff = true;
     } else {
       parsed.targets.push(arg);
     }
@@ -101,5 +111,7 @@ function isWithinImportRange(playedAt) {
 
 function usage() {
   console.error(`Usage:
-  npm run spotify:import -- [--after ISO_DATE] [--before ISO_DATE] /path/to/json-or-directory`);
+  npm run spotify:import -- [--after ISO_DATE] [--before ISO_DATE | --no-cutoff] /path/to/json-or-directory
+
+By default only plays before the first play synced from Spotify are imported.`);
 }

@@ -86,10 +86,12 @@ Spotify can send two useful export shapes:
 The project importer supports both. The extended export is better for long-term
 recaps because it has album names and Spotify Track URI fields more often.
 
-One-year account data can overlap with rows already collected from the Spotify
-Web API. It usually has minute-level timestamps and no Spotify Track URI, so it
-cannot always deduplicate perfectly against API-synced rows. Use `--before` to
-stop the account-data import before your first API-synced play.
+Exports overlap with rows already collected from the Spotify Web API, and the
+two never deduplicate against each other: synced plays have millisecond
+timestamps, export rows have whole seconds (or whole minutes in one-year account
+data). So by default the importer looks up your first API-synced play and only
+imports what was played before it. Pass `--before` to choose another cutoff,
+or `--no-cutoff` to import everything.
 
 Spotify usually sends a zip. Extract it locally. The importer scans nested
 folders and reads every `.json` file it can parse as an array.
@@ -150,17 +152,19 @@ track appears from the Web API or a richer extended export.
 
 ## Import to Remote D1
 
-First run a dry run. This writes SQL chunks but does not touch D1:
+First run a dry run. This reads the first synced play from D1 and writes SQL
+chunks, but does not change D1:
 
 ```bash
 npm run cf:import -- --remote --dry-run /path/to/extracted/spotify/export
 ```
 
-If the export overlaps with API-synced rows, add a cutoff. For example, if your
-first API row is `2026-07-05T13:02:33.723Z`:
+It prints the cutoff it uses, for example
+`Importing plays before 2026-01-15T08:30:00.000Z, the first play synced from Spotify.`
+To use a different cutoff:
 
 ```bash
-npm run cf:import -- --remote --dry-run --before 2026-07-05T13:02:33.723Z /path/to/extracted/spotify/export
+npm run cf:import -- --remote --dry-run --before 2026-01-15T00:00:00Z /path/to/extracted/spotify/export
 ```
 
 Then back up:
@@ -175,11 +179,7 @@ Then import:
 npm run cf:import -- --remote /path/to/extracted/spotify/export
 ```
 
-Or with the same cutoff:
-
-```bash
-npm run cf:import -- --remote --before 2026-07-05T13:02:33.723Z /path/to/extracted/spotify/export
-```
+Add the same `--before` or `--no-cutoff` you used for the dry run, if any.
 
 The import command prints an `Import rollback marker`. Keep that exact timestamp
 if you may want to remove only that import later.
@@ -196,7 +196,7 @@ Check latest rows:
 npx wrangler d1 execute spotify-discord-stats --remote --command "SELECT played_at, track_name, album_name, source FROM plays ORDER BY played_at_ms DESC LIMIT 10;"
 ```
 
-Find the first API-synced row before choosing an import cutoff:
+Show the first and last API-synced rows (the default cutoff is the first):
 
 ```bash
 npx wrangler d1 execute spotify-discord-stats --remote --command "SELECT MIN(played_at) AS first_api, MAX(played_at) AS last_api, COUNT(*) AS api_rows FROM plays WHERE source = 'spotify_api';"

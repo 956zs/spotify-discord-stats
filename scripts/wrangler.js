@@ -11,15 +11,31 @@ const wranglerBin = path.join(path.dirname(packageJsonPath), require(packageJson
 
 export function runWrangler(args) {
   console.log(`wrangler ${args.join(' ')}`);
-  const result = spawnSync(process.execPath, [wranglerBin, ...args], {
-    stdio: 'inherit',
-    cwd: process.cwd()
+  exitOnFailure(spawnWrangler(args, { stdio: 'inherit' }));
+}
+
+export function runWranglerJson(args) {
+  const result = spawnWrangler([...args, '--json'], {
+    encoding: 'utf8',
+    stdio: ['inherit', 'pipe', 'inherit']
   });
+  exitOnFailure(result);
+  return JSON.parse(result.stdout);
+}
+
+function spawnWrangler(args, options) {
+  return spawnSync(process.execPath, [wranglerBin, ...args], { cwd: process.cwd(), ...options });
+}
+
+function exitOnFailure(result) {
   if (result.error) {
     console.error(`Could not run wrangler: ${result.error.message}`);
     process.exit(1);
   }
   if (result.status !== 0) {
+    if (result.stdout) {
+      console.error(result.stdout);
+    }
     process.exit(result.status ?? 1);
   }
 }
