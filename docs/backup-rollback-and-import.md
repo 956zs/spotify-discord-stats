@@ -234,6 +234,10 @@ WHERE NOT EXISTS (
   WHERE pa.artist_key = artists.artist_key
 );
 
+-- The widget stat counts included the deleted plays: rebuild them on the next sync.
+DELETE FROM stat_windows;
+DELETE FROM app_state WHERE key LIKE 'widget_metrics_cache:%';
+
 COMMIT;
 ```
 

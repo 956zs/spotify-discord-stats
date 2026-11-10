@@ -118,9 +118,19 @@ Signing in sets a 30-day session cookie signed with `ADMIN_TOKEN`, so changing
 the token signs every session out.
 
 Only the queries the chosen slots need are run, once per distinct range.
-Results are cached per range and reused until a newer play arrives, the hour
-changes, or the slot selection changes. After importing older history, press
-Sync now on the Status tab to refresh the cached numbers. The "new artists" metric needs
+Results are cached per range and reused until a play is added, the hour
+changes, or the slot selection changes. Each range in the saved settings also
+keeps per-song / album / artist / hour / day play counts in D1 (`stat_windows`
+and `stat_counts`, migration `0006`). A sync only reads the plays added since
+the last one and the plays that left the window, so D1 reads stay small even
+for the all-time range. The first sync after deploying, after changing which
+ranges or metrics the slots use, and after an import rebuilds these counts once
+(one full read of the range, plus a write per counted song, album, and artist).
+Previews of unsaved settings reuse existing counts and otherwise query the plays
+directly. The import script resets the counts by itself. If you delete or edit
+plays by hand, run
+`DELETE FROM stat_windows; DELETE FROM app_state WHERE key LIKE 'widget_metrics_cache:%';`
+afterwards. The "new artists" metric needs
 migration `0004`. Uploaded hero images live in the `widget_images` table from
 migration `0005`.
 

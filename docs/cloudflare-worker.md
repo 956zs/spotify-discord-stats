@@ -122,8 +122,10 @@ npm run cf:d1:migrate:remote
 
 Migrations include the `album_image_url` column used by recap report artwork,
 read-path indexes (`0003`), the artist first-play index used by the "new
-artists" widget metric (`0004`), and the `widget_images` table for an uploaded
-widget hero image (`0005`).
+artists" widget metric (`0004`), the `widget_images` table for an uploaded
+widget hero image (`0005`), and the `stat_windows` / `stat_counts` tables that keep
+the widget numbers up to date incrementally (`0006`). Apply `0006` before deploying
+the Worker version that uses it.
 
 ## Deploy
 
