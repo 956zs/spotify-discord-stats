@@ -26,7 +26,7 @@ no server of your own.
 > update (this project's own widget does), but Discord now only gives the
 > widget editor to apps with a
 > [claimed game](https://docs.discord.com/developers/social-layer/game-stats-widgets/overview).
-> You will see in [Step 7](#step-7-set-up-the-profile-widget) whether your app
+> You will see in [Step 6](#step-6-set-up-the-profile-widget) whether your app
 > has it. Without a widget, everything else still works: stats, the admin page,
 > and recap DMs.
 
@@ -34,6 +34,7 @@ no server of your own.
 
 - [What you need](#what-you-need)
 - [Setup, step by step](#setup-step-by-step)
+- [Deploy from your computer instead](#deploy-from-your-computer-instead)
 - [Choosing what the widget shows](#choosing-what-the-widget-shows)
 - [What happens next](#what-happens-next)
 - [Import your full Spotify history](#import-your-full-spotify-history-optional)
@@ -51,55 +52,36 @@ no server of your own.
   server works; creating one is free.
 - **A free [Cloudflare](https://dash.cloudflare.com/sign-up) account.** This is
   where the project runs.
-- **[Node.js](https://nodejs.org/) 24 or newer** on your computer, used only to
-  set things up. After installing it, open a new terminal and run `node -v` to
-  check that it prints `v24` or higher.
-- About 30 minutes.
+- **A free [GitHub](https://github.com/signup) account.** The Deploy button
+  puts your own copy of the project there. A GitLab account also works.
+- About 15 minutes.
 
-You will paste commands into a terminal in the project folder:
-
-- **Windows:** open the folder in File Explorer, click the address bar, type
-  `cmd`, and press Enter. Use this Command Prompt rather than PowerShell, which
-  often blocks `npm` with a "running scripts is disabled" error.
-- **macOS:** right-click the folder in Finder and choose **Services** →
-  **New Terminal at Folder**.
-- **Linux:** open a terminal and `cd` into the folder.
+You don't need Node.js or a terminal. Everything happens in the browser. (If
+you would rather deploy from your own computer, see
+[Deploy from your computer instead](#deploy-from-your-computer-instead).)
 
 Along the way you will collect a few values. Keep a text file open and paste
 them there as you go:
 
 | Value | You get it in |
 | --- | --- |
-| Discord Application ID | Step 2 |
-| Discord bot token (keep secret) | Step 2 |
-| Your Discord user ID | Step 2 |
-| Database ID | Step 3 |
-| Your Worker URL | Step 3 |
+| Discord bot token (keep secret) | Step 1 |
+| Admin password (keep secret, you make it up) | Step 2 |
 | Spotify Client ID | Step 4 |
 | Spotify Client Secret (keep secret) | Step 4 |
-| Admin password (keep secret, you make it up) | Step 5 |
 
 ## Setup, step by step
 
-### Step 1: Download the project
+The short version: create a Discord bot, click this button, then finish on
+your admin page.
 
-Click the green **Code** button on this page, then **Download ZIP**, and unzip
-it. Or, if you use git:
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/956zs/spotify-discord-stats)
 
-```bash
-git clone https://github.com/956zs/spotify-discord-stats.git
-```
-
-Open a terminal in the project folder (see [What you need](#what-you-need))
-and install what it needs:
-
-```bash
-npm install
-```
-
-### Step 2: Create a Discord app and bot
+### Step 1: Create a Discord app and bot
 
 The profile widget belongs to this app, and its bot sends you the recap DMs.
+Create it with your own Discord account: the Worker sends the DMs to, and
+updates the widget of, the account that owns the app.
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
    and click **New Application**. Its name is shown on the widget, for example
@@ -107,129 +89,43 @@ The profile widget belongs to this app, and its bot sends you the recap DMs.
 
    <img src="docs/images/portal-new-app.png" alt="Create a new app dialog" width="380">
 
-2. On the **General Information** page, copy the **Application ID**.
-
-   <img src="docs/images/portal-app-id.png" alt="Application ID with a Copy button" width="380">
-3. Open the **Bot** page, click **Reset Token**, and copy the token. Discord
+2. Open the **Bot** page, click **Reset Token**, and copy the token. Discord
    shows it only once. Treat it like a password.
 
    <img src="docs/images/portal-bot-token.png" alt="Reset Token button on the Bot page" width="520">
-4. Add the bot to your server: open **OAuth2** → **URL Generator** and tick
+3. Add the bot to your server: open **OAuth2** → **URL Generator** and tick
    the `bot` scope. No permissions are needed. Open the generated link at the
    bottom, pick your server, then click **Continue** and **Authorize**.
 
    <img src="docs/images/portal-oauth2.png" alt="OAuth2 URL Generator with the bot scope ticked" width="640">
-5. Get your own user ID: in Discord, open **User Settings** (the gear icon) →
-   **Advanced** and turn on **Developer Mode**. Then right-click your name
-   anywhere and choose **Copy User ID**.
+
+You don't need the Application ID or your user ID. The Worker reads both from
+the bot token.
 
 > [!NOTE]
 > The bot can only DM you if you share a server with it and that server allows
 > DMs from members (right-click the server → **Privacy Settings**).
 
-### Step 3: Set up Cloudflare
+### Step 2: Click Deploy to Cloudflare
 
-1. Log in to Cloudflare from the terminal. A browser window opens; click
-   **Allow**.
+1. Click the **Deploy to Cloudflare** button above.
+2. Sign in to Cloudflare, and connect your GitHub account when asked.
+   Cloudflare makes a copy of this project in your GitHub account and creates
+   the database for you. You can keep the suggested names.
+3. Cloudflare asks for two values:
+   - `DISCORD_TOKEN`: the bot token from Step 1.
+   - `ADMIN_TOKEN`: your admin password. Make up a long random string of at
+     least 32 characters (a password manager can generate one). You use it to
+     sign in to the admin page. Cloudflare never shows it again, so keep it
+     somewhere safe.
+4. Start the deploy and wait for it to finish. It sets up the database by
+   itself.
+5. Cloudflare shows your **Worker URL**, something like
+   `https://spotify-discord-stats.your-name.workers.dev`. Copy it. You can
+   also find it later in the Cloudflare dashboard under **Workers & Pages**.
+   A brand-new `workers.dev` address can take a few minutes to start working.
 
-   ```bash
-   npx wrangler login
-   ```
-
-2. Make your settings file by copying the example. On Windows, use `copy`
-   instead of `cp`, or copy and rename the file in File Explorer.
-
-   ```bash
-   cp wrangler.example.toml wrangler.toml
-   ```
-
-3. Create the database:
-
-   ```bash
-   npm run cf:d1:create
-   ```
-
-   It prints a `database_id`, a long ID like `1a2b3c4d-...`. Copy it.
-4. Open `wrangler.toml` in a plain text editor (Notepad on Windows; on macOS
-   use a code editor such as VS Code, because TextEdit changes `"` into curly
-   quotes). Paste the ID into `database_id = "paste-database-id-here"` and
-   save.
-5. Set up the database tables, then put the project online for the first time.
-   If a command asks you to confirm, type `y` and press Enter.
-
-   ```bash
-   npm run cf:d1:migrate:remote
-   npm run cf:deploy
-   ```
-
-   If this is your first Worker, Wrangler asks you to pick a `workers.dev`
-   subdomain. Any available name works. A brand-new address can take a few
-   minutes to start working.
-6. The deploy prints your **Worker URL**, something like
-   `https://spotify-discord-stats.your-name.workers.dev`. Copy it.
-
-### Step 4: Create a Spotify app
-
-1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard),
-   log in, and click **Create app**.
-2. Fill in:
-   - **App name** and **App description**: anything, for example
-     `My Spotify Stats`.
-   - **Redirect URIs**: your Worker URL followed by `/spotify/callback`, for
-     example `https://spotify-discord-stats.your-name.workers.dev/spotify/callback`.
-     Click **Add**.
-   - When asked which APIs you plan to use, tick **Web API**.
-
-   <img src="docs/images/spotify-create.png" alt="Spotify Create app form filled in" width="640">
-3. Accept the terms and click **Save**.
-4. Open the app's **Settings**. Copy the **Client ID**, then click
-   **View client secret** and copy the **Client Secret**.
-
-   <img src="docs/images/spotify-settings.png" alt="Spotify app settings with the Client ID and View client secret" width="640">
-
-> [!NOTE]
-> The stats come from the Spotify account you sign in with in Step 6, not
-> from the account that owns this app. They can be the same account. If they
-> differ, add the account you will sign in with under **Settings** →
-> **User Management** first.
-
-### Step 5: Fill in your settings
-
-1. Open `wrangler.toml` again and fill in the `[vars]` section with your
-   values. Keep the quotes:
-
-   ```toml
-   [vars]
-   DISCORD_CLIENT_ID = "your Discord Application ID"
-   DISCORD_USER_ID = "your Discord user ID"
-   SPOTIFY_CLIENT_ID = "your Spotify Client ID"
-   SPOTIFY_REDIRECT_URI = "https://spotify-discord-stats.your-name.workers.dev/spotify/callback"
-   PUBLIC_BASE_URL = "https://spotify-discord-stats.your-name.workers.dev"
-   ```
-
-2. Make up an admin password: a long random string of at least 32 characters
-   (a password manager can generate one). You use it to sign in to the admin
-   page.
-3. Save the three secret values in Cloudflare. Run each command, then paste
-   the value when it asks and press Enter. Nothing appears while you paste;
-   that is normal.
-
-   ```bash
-   npx wrangler secret put DISCORD_TOKEN
-   npx wrangler secret put SPOTIFY_CLIENT_SECRET
-   npx wrangler secret put ADMIN_TOKEN
-   ```
-
-   `DISCORD_TOKEN` is the bot token, `SPOTIFY_CLIENT_SECRET` the Spotify
-   Client Secret, and `ADMIN_TOKEN` your admin password. Cloudflare never shows
-   them again, so keep your admin password somewhere safe.
-4. Deploy again so the new settings take effect:
-
-   ```bash
-   npm run cf:deploy
-   ```
-
-### Step 6: Connect your Spotify account
+### Step 3: Open the admin page
 
 1. Open your Worker URL followed by `/admin`, for example
    `https://spotify-discord-stats.your-name.workers.dev/admin`.
@@ -238,11 +134,50 @@ The profile widget belongs to this app, and its bot sends you the recap DMs.
    switch in the header to change it.
 
    <img src="docs/images/admin-login.png" alt="Admin sign-in page" width="340">
-3. Open the **Status** tab and click **Reconnect Spotify**. Spotify asks for
-   permission to read your recently played songs. Click **Agree**. You should
-   see **Spotify authorization complete**.
 
-### Step 7: Set up the profile widget
+The page opens on the **Status** tab, because the Spotify app is not set up
+yet. That is the next step. The **Discord app** line in the status list shows
+your app ID and the user the DMs and widget go to; that should be you.
+
+### Step 4: Create a Spotify app
+
+The **Spotify app** panel at the top of the **Status** tab shows your
+**Redirect URI**, with a **Copy** button. It is your Worker URL followed by
+`/spotify/callback`.
+
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard),
+   log in, and click **Create app**.
+2. Fill in:
+   - **App name** and **App description**: anything, for example
+     `My Spotify Stats`.
+   - **Redirect URIs**: paste the Redirect URI from the admin page and click
+     **Add**.
+   - When asked which APIs you plan to use, tick **Web API**.
+
+   <img src="docs/images/spotify-create.png" alt="Spotify Create app form filled in" width="640">
+3. Accept the terms and click **Save**.
+4. Open the app's **Settings**. Copy the **Client ID**, then click
+   **View client secret** and copy the **Client Secret**.
+
+   <img src="docs/images/spotify-settings.png" alt="Spotify app settings with the Client ID and View client secret" width="640">
+5. Back on the admin page, paste both into the **Spotify app** panel and click
+   **Save and check**. The page checks the pair with Spotify before saving it,
+   so a typo shows up right away.
+
+> [!NOTE]
+> The stats come from the Spotify account you sign in with in Step 5, not
+> from the account that owns this app. They can be the same account. If they
+> differ, add the account you will sign in with under **Settings** →
+> **User Management** first.
+
+### Step 5: Connect your Spotify account
+
+On the **Status** tab, click **Reconnect Spotify**. (It stays greyed out until
+the Spotify app is saved.) Spotify asks for permission to read your recently
+played songs. Click **Agree**. You should see
+**Spotify authorization complete**.
+
+### Step 6: Set up the profile widget
 
 Custom widgets come from a Discord experiment, so part of the setup uses
 workarounds. chloecinders' guide [How to Make Discord Widgets](https://chloecinders.com/blog/discord-widgets) covers
@@ -252,7 +187,7 @@ them in detail. Follow it, with two shortcuts from this project:
    open your app. In the left menu under **Games**, click **Widget**.
 
    > If there is no **Widget** item, Discord has not given your app the widget
-   > editor (see the warning at the top). Skip to Step 8; everything except the
+   > editor (see the warning at the top). Skip to Step 7; everything except the
    > widget works.
 
 2. **Shortcut 1:** instead of building the widget by hand, open
@@ -283,7 +218,7 @@ them in detail. Follow it, with two shortcuts from this project:
 
 Field names and details: [docs/discord-widget.md](docs/discord-widget.md).
 
-### Step 8: Check that it works
+### Step 7: Check that it works
 
 1. On the admin page's **Status** tab, click **Sync now**. Under
    **Last action result** you see **Fetched N plays, added N new** and whether
@@ -295,7 +230,62 @@ Field names and details: [docs/discord-widget.md](docs/discord-widget.md).
 3. On the **Recaps** tab, click **Send weekly** and confirm. A recap DM from
    your bot arrives within a few seconds.
 
-Done. You can close the terminal; everything now runs on Cloudflare.
+Done. Everything now runs on Cloudflare.
+
+## Deploy from your computer instead
+
+You can skip GitHub and the Deploy button and deploy from a terminal instead.
+Do Step 1 first, then:
+
+1. Install [Node.js](https://nodejs.org/) 24 or newer. After installing it,
+   open a new terminal and run `node -v` to check that it prints `v24` or
+   higher.
+2. Download the project: click the green **Code** button on this page, then
+   **Download ZIP**, and unzip it. Or, if you use git:
+
+   ```bash
+   git clone https://github.com/956zs/spotify-discord-stats.git
+   ```
+
+3. Open a terminal in the project folder:
+   - **Windows:** open the folder in File Explorer, click the address bar, type
+     `cmd`, and press Enter. Use this Command Prompt rather than PowerShell,
+     which often blocks `npm` with a "running scripts is disabled" error.
+   - **macOS:** right-click the folder in Finder and choose **Services** →
+     **New Terminal at Folder**.
+   - **Linux:** open a terminal and `cd` into the folder.
+4. Install what it needs, and log in to Cloudflare. A browser window opens;
+   click **Allow**.
+
+   ```bash
+   npm install
+   npx wrangler login
+   ```
+
+5. Put the project online. This creates the Worker and its database. The
+   first time, it asks a few questions, such as a `workers.dev` subdomain for
+   your first Worker; any available name works. If it asks you to confirm,
+   type `y` and press Enter.
+
+   ```bash
+   npm run deploy
+   ```
+
+   It prints your **Worker URL**. Copy it. A brand-new address can take a few
+   minutes to start working.
+6. Save the bot token and your admin password (see Step 2) in Cloudflare. Run
+   each command, then paste the value when it asks and press Enter. Nothing
+   appears while you paste; that is normal.
+
+   ```bash
+   npx wrangler secret put DISCORD_TOKEN
+   npx wrangler secret put ADMIN_TOKEN
+   ```
+
+7. Continue with [Step 3](#step-3-open-the-admin-page).
+
+The first deploy prints `Creating new D1 Database` and then sets up the
+database tables. Later deploys find the same database by its name.
 
 ## Choosing what the widget shows
 
@@ -352,7 +342,11 @@ Recaps can be turned off on the admin page: on the **Recaps** tab, switch off
 
 ## Import your full Spotify history (optional)
 
-Spotify can send you everything you have ever played:
+Spotify can send you everything you have ever played. Importing it needs a
+computer with Node.js: do steps 1 to 4 of
+[Deploy from your computer instead](#deploy-from-your-computer-instead) (if
+you used the Deploy button, download your own copy of the project from your
+GitHub account rather than this one), but don't run `npm run deploy`.
 
 1. Go to your [Spotify privacy settings](https://www.spotify.com/account/privacy/)
    and request **Extended streaming history**. Spotify emails it to you,
@@ -401,12 +395,12 @@ it has less detail. To undo an import, see
 **Workaround without Premium:** Spotify only requires the app's owner to have
 Premium. Someone with Premium (a friend, or your plan manager) can add your
 Spotify email to their app under **User Management** (up to 5 users per app),
-add your Worker's `/spotify/callback` URL to its Redirect URIs, and give you the
-app's Client ID and Client Secret. In Step 6, connect your own Spotify account
-(sign out of theirs first): the Worker records whichever account you connect,
-not the app owner's. Only do this with people you trust: whoever has the Client
-Secret can act as that app, and the app stops working if the owner's Premium
-lapses.
+add your Redirect URI (from your admin page) to its Redirect URIs, and give you
+the app's Client ID and Client Secret. In Step 5, connect your own Spotify
+account (sign out of theirs first): the Worker records whichever account you
+connect, not the app owner's. Only do this with people you trust: whoever has
+the Client Secret can act as that app, and the app stops working if the owner's
+Premium lapses.
 </details>
 
 <details>
@@ -420,7 +414,9 @@ You only need Spotify Premium, which Spotify requires for developer apps.
 <summary><b>Do I need my own domain?</b></summary>
 
 No. The free `workers.dev` address works. To use your own domain, add it to
-Cloudflare and uncomment `routes` in `wrangler.toml`.
+Cloudflare, uncomment `routes` in `wrangler.toml` (on your GitHub copy if you
+used the Deploy button), and deploy again. Then open the admin page on the new
+address and add the Redirect URI it shows to your Spotify app.
 </details>
 
 <details>
@@ -460,43 +456,54 @@ history has the exact play time.
 Yes, by editing `recapReports` in [config/app.json](config/app.json) and
 deploying again: `weeklyDay` (0 = Sunday, 1 = Monday, ...), `monthlyDay`,
 `sendHour`, and `sendMinute` (a multiple of 10). Times are in Taiwan time
-(UTC+8); the time zone itself can't be changed yet.
+(UTC+8); the time zone itself can't be changed yet. If you used the Deploy
+button, edit the file in your GitHub copy; saving it there deploys again.
 </details>
 
 <details>
 <summary><b>Who can see my data?</b></summary>
 
-Your plays are stored in your own Cloudflare database. The admin page and its
-routes need your admin password. Spotify only lets the Worker read your
-recently played songs. Anyone who opens your Discord profile sees what the
-widget shows.
+Your plays, your Spotify connection, and your Spotify app's Client Secret are
+stored in your own Cloudflare database. The admin page and its routes need
+your admin password. Spotify only lets the Worker read your recently played
+songs. Anyone who opens your Discord profile sees what the widget shows.
 </details>
 
 <details>
 <summary><b>How do I remove everything?</b></summary>
 
-1. Delete the Worker and its database:
-
-   ```bash
-   npx wrangler delete
-   npx wrangler d1 delete spotify-discord-stats
-   ```
-
-2. Remove the app's access at [spotify.com/account/apps](https://www.spotify.com/account/apps/)
+1. In the [Cloudflare dashboard](https://dash.cloudflare.com/), delete the
+   Worker (under **Workers & Pages**) and its D1 database. From a terminal in
+   the project folder, `npx wrangler delete` removes the Worker.
+2. If you used the Deploy button, delete your copy of the project on GitHub.
+3. Remove the app's access at [spotify.com/account/apps](https://www.spotify.com/account/apps/)
    and delete the app in the Spotify Developer Dashboard.
-3. Remove the widget from your Discord profile, then delete the app in the
+4. Remove the widget from your Discord profile, then delete the app in the
    Discord Developer Portal.
 </details>
 
 ## Troubleshooting
 
+To change a secret such as `DISCORD_TOKEN` or `ADMIN_TOKEN`, open your Worker
+in the Cloudflare dashboard → **Settings** → **Variables and Secrets**, or run
+`npx wrangler secret put NAME` from the project folder.
+
 <details>
 <summary><b>Spotify says <code>INVALID_CLIENT: Invalid redirect URI</code></b></summary>
 
-The Redirect URI in the Spotify dashboard and `SPOTIFY_REDIRECT_URI` in
-`wrangler.toml` must match exactly, including `https://` and with no trailing
-slash. Fix whichever one is wrong, then run `npm run cf:deploy` if you changed
-`wrangler.toml`.
+The Redirect URI in the Spotify dashboard must match the one on your admin
+page exactly, including `https://` and with no trailing slash. To see it again,
+click **Change** on the **Spotify app** panel of the **Status** tab (then
+**Cancel**). The Redirect URI follows the address you open the admin page on;
+if you use more than one address (for example `workers.dev` and your own
+domain), add each one's Redirect URI to the Spotify app.
+</details>
+
+<details>
+<summary><b>Save and check says the Client ID or Client Secret is wrong</b></summary>
+
+Copy both again from the Spotify app's **Settings**. Each is 32 letters and
+digits.
 </details>
 
 <details>
@@ -510,8 +517,9 @@ in the Spotify app settings.
 <details>
 <summary><b>The widget does not update, or the admin page warns that the widget push failed</b></summary>
 
-- Check that the widget is on your profile (Step 7) and that
-  `DISCORD_CLIENT_ID` is the Application ID of the app that owns the widget.
+- Check that the widget is on your profile (Step 6) and that it belongs to the
+  same Discord app as the bot token. The **Discord app** line on the
+  **Status** tab shows that app's ID.
 - After a sync, the admin page shows the reason as a yellow warning under
   **Last action result** on the **Status** tab; plays are still saved and
   recaps still go out.
@@ -530,30 +538,75 @@ in the Spotify app settings.
 - Make sure the bot is in a server you are also in.
 - In that server, allow DMs from members (right-click the server →
   **Privacy Settings**).
-- Check that `DISCORD_USER_ID` is your user ID, not the Application ID.
-- Check that the bot token is current. Resetting it in the Developer Portal
-  invalidates the old one; run `npx wrangler secret put DISCORD_TOKEN` again.
+- Check the **Discord app** line on the **Status** tab. It shows the user the
+  DMs go to. That is the owner of the Discord app (for an app that belongs to
+  a team, the team owner). To send them to someone else, set
+  `DISCORD_USER_ID` (DMs and widget) or `DISCORD_REMINDER_USER_ID` (DMs only),
+  see [docs/cloudflare-worker.md](docs/cloudflare-worker.md#optional-settings).
+- If that line says **Could not read the app from the bot token**, the bot
+  token is wrong or was reset. Resetting it in the Developer Portal
+  invalidates the old one; save the new one as `DISCORD_TOKEN`.
 </details>
 
 <details>
 <summary><b>The admin page rejects my password (<code>Wrong token</code>)</b></summary>
 
-The password does not match `ADMIN_TOKEN`. If you lost it, set a new one with
-`npx wrangler secret put ADMIN_TOKEN`.
+The password does not match `ADMIN_TOKEN`. If you lost it, set a new one as
+`ADMIN_TOKEN`.
 </details>
 
 ## Updating
 
-Download the new version (or `git pull`). If you downloaded a ZIP, copy your
-`wrangler.toml` from the old folder into the new one. Then run:
+Your secrets, settings, and data are kept when you update. Every deploy also
+applies new database changes first.
+
+**If you used the Deploy button:** your project lives in your own GitHub copy,
+which Cloudflare deploys again each time it changes (Workers Builds). Bring in
+the new version there:
+
+- If your copy is a fork of this project, open it on GitHub and click
+  **Sync fork**.
+- If it is a plain copy (no **Sync fork** button), pull the changes from this
+  project with git and push them to your copy:
+
+  ```bash
+  git pull https://github.com/956zs/spotify-discord-stats.git main
+  git push
+  ```
+
+Pushing to your copy starts a new build and deploy. You can follow it on your
+Worker's page in the Cloudflare dashboard.
+
+**If you deployed from your computer:** download the new version (or
+`git pull`), then run:
 
 ```bash
 npm install
-npm run cf:d1:migrate:remote
-npm run cf:deploy
+npm run deploy
 ```
 
-Your secrets, settings, and data are kept.
+If you made a `wrangler.local.toml` and downloaded a ZIP, copy it from the old
+folder into the new one.
+
+### Upgrading an existing setup
+
+If you set this up before the Deploy button existed, there is nothing to
+change: values you set in Cloudflare (the `[vars]` in your `wrangler.toml` and
+your secrets) keep working and always win over the values the Worker finds by
+itself. The **Spotify app** panel then says that the app is set in Cloudflare.
+
+The project now ships its own `wrangler.toml`, so your untracked one would
+block `git pull`. Rename yours to `wrangler.local.toml` first; all the npm
+scripts use `wrangler.local.toml` when it exists. Then:
+
+```bash
+git pull
+npm install
+npm run deploy
+```
+
+ZIP users: copy your old `wrangler.toml` into the new folder as
+`wrangler.local.toml`.
 
 ## More docs
 
@@ -561,7 +614,7 @@ Your secrets, settings, and data are kept.
 - [Discord profile widget](docs/discord-widget.md): field names and how the
   widget is updated.
 - [Cloudflare Worker deployment](docs/cloudflare-worker.md): the setup above
-  in reference form.
+  in reference form, with every setting you can override.
 - [Backup, rollback, and history import](docs/backup-rollback-and-import.md)
 - [Running on your own server](docs/vps-deployment.md): a Node.js + SQLite
   alternative to Cloudflare. It does not send scheduled recaps.
@@ -578,7 +631,7 @@ Project layout:
 - `shared/`: runtime-neutral helpers (time, keys, play parsing, metrics,
   recap rendering).
 - `src/`: Node.js + SQLite runtime for local development and the VPS option.
-- `scripts/`: D1 backup and history import tools.
+- `scripts/`: deploy, Wrangler wrapper, D1 backup, and history import tools.
 - `migrations/`: D1 schema migrations.
 - `config/`: default app and widget settings.
 - `test/`: Node test suite.
@@ -590,9 +643,20 @@ npm test
 find src worker shared scripts test -name '*.js' -print0 | xargs -0 -n 1 node --check
 ```
 
-To run the Worker locally, apply the migrations to a local database, put the
-secrets (`DISCORD_TOKEN`, `SPOTIFY_CLIENT_SECRET`, `ADMIN_TOKEN`) in a
-`.dev.vars` file as `NAME=value` lines, and start it:
+The shipped [wrangler.toml](wrangler.toml) has no IDs, so it works with the
+Deploy button as is. Put a personal config (account ID, your own domain,
+database ID, `[vars]`) in `wrangler.local.toml` (gitignored), starting from a
+copy of `wrangler.toml`. Every npm script that runs Wrangler (`npm run deploy`,
+`cf:dev`, `cf:d1:migrate:*`, `cf:d1:backup:*`, `cf:import`) uses it when it
+exists; `npm run cf -- <wrangler args>` runs any other Wrangler command the
+same way. The D1 scripts address the database by its binding name `DB`.
+`npm run deploy` applies migrations and then deploys; when the database does
+not exist yet, it deploys first so Wrangler creates it, then migrates.
+
+To run the Worker locally, copy [.dev.vars.example](.dev.vars.example) to
+`.dev.vars` and fill in `DISCORD_TOKEN` and `ADMIN_TOKEN`. Enter the Spotify
+app on the admin page, or put `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`
+in `.dev.vars`. Then apply the migrations to a local database and start it:
 
 ```bash
 npm run cf:d1:migrate:local
@@ -600,8 +664,9 @@ npm run cf:dev
 ```
 
 The Node/SQLite commands (`npm run spotify:auth-url`, `spotify:token`,
-`spotify:sync`, `npm start`) read `.env`; copy [.env.example](.env.example) to
-get started.
+`spotify:sync`, `npm start`) read `.env`; copy
+[node.env.example](node.env.example) to `.env` to get started. That runtime
+finds nothing by itself: fill in the Discord and Spotify values there.
 
 Known limitations:
 

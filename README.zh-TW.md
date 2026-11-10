@@ -21,13 +21,14 @@
 > **現在還能做個人檔案 widget 嗎？** Discord 在 2026-07-27 結束了自訂個人檔案 widget
 > 的實驗。實驗期間做好的 widget 目前還會更新（這個專案自己的就是），但 Discord 現在只把
 > widget 編輯器開放給[認領過遊戲](https://docs.discord.com/developers/social-layer/game-stats-widgets/overview)
-> 的 app。你的 app 有沒有這個功能，到[第 7 步](#第-7-步設定個人檔案-widget)就會知道。
+> 的 app。你的 app 有沒有這個功能，到[第 6 步](#第-6-步設定個人檔案-widget)就會知道。
 > 就算沒有 widget，其他功能都照常能用：統計、admin 頁和回顧私訊。
 
 ## 目錄
 
 - [需要準備什麼](#需要準備什麼)
 - [一步一步設定](#一步一步設定)
+- [改從自己的電腦部署](#改從自己的電腦部署)
 - [選擇 widget 要顯示什麼](#選擇-widget-要顯示什麼)
 - [設定完之後](#設定完之後)
 - [匯入完整的 Spotify 歷史（選用）](#匯入完整的-spotify-歷史選用)
@@ -43,119 +44,89 @@
   （也就是這裡要建立的那種）。
 - **Discord 帳號**，以及一個你有權限加 bot 的伺服器。自己開一個空的伺服器就行，免費。
 - **免費的 [Cloudflare](https://dash.cloudflare.com/sign-up) 帳號。** 程式就跑在這裡。
-- **電腦上裝好 [Node.js](https://nodejs.org/) 24 以上**，只有設定時會用到。裝好之後開一個
-  新的終端機，執行 `node -v`，確認印出來的是 `v24` 或更新的版本。
-- 大約 30 分鐘。
+- **免費的 [GitHub](https://github.com/signup) 帳號。** 部署按鈕會把這個專案複製一份到你的帳號裡。
+  用 GitLab 帳號也可以。
+- 大約 15 分鐘。
 
-接下來要在專案資料夾裡開終端機貼指令：
-
-- **Windows**：用檔案總管打開資料夾，點一下網址列，輸入 `cmd` 按 Enter。請用這個命令提示字元，
-  不要用 PowerShell，它常常會擋下 `npm`，出現「已停用指令碼執行」的錯誤。
-- **macOS**：在 Finder 對資料夾按右鍵，選 **服務** → **新增位於檔案夾位置的終端機視窗**。
-- **Linux**：開終端機，`cd` 到資料夾裡。
+不需要 Node.js，也不用開終端機，全部在瀏覽器裡完成。（想從自己的電腦部署的話，請看
+[改從自己的電腦部署](#改從自己的電腦部署)。）
 
 過程中會拿到幾個值。建議開一個記事本，邊做邊貼進去：
 
 | 值 | 在哪一步拿到 |
 | --- | --- |
-| Discord Application ID | 第 2 步 |
-| Discord bot token（不能外流） | 第 2 步 |
-| 你的 Discord 使用者 ID | 第 2 步 |
-| 資料庫 ID | 第 3 步 |
-| 你的 Worker 網址 | 第 3 步 |
+| Discord bot token（不能外流） | 第 1 步 |
+| 管理密碼（不能外流，自己想一個） | 第 2 步 |
 | Spotify Client ID | 第 4 步 |
 | Spotify Client Secret（不能外流） | 第 4 步 |
-| 管理密碼（不能外流，自己想一個） | 第 5 步 |
 
 ## 一步一步設定
 
-### 第 1 步：下載專案
+簡單說：建一個 Discord bot，按下面這個按鈕，再到你的 admin 頁把剩下的設定完。
 
-在這個頁面按綠色的 **Code** 按鈕，選 **Download ZIP**，再解壓縮。會用 git 的話也可以：
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/956zs/spotify-discord-stats)
 
-```bash
-git clone https://github.com/956zs/spotify-discord-stats.git
-```
+### 第 1 步：建立 Discord app 和 bot
 
-在專案資料夾裡開終端機（見[需要準備什麼](#需要準備什麼)），安裝需要的套件：
-
-```bash
-npm install
-```
-
-### 第 2 步：建立 Discord app 和 bot
-
-個人檔案 widget 屬於這個 app，回顧私訊則由它的 bot 寄給你。
+個人檔案 widget 屬於這個 app，回顧私訊則由它的 bot 寄給你。請用你自己的 Discord 帳號建立：
+Worker 會把私訊寄給 app 的擁有者，也是更新他的 widget。
 
 1. 打開 [Discord Developer Portal](https://discord.com/developers/applications)，
    按 **New Application**。名字會顯示在 widget 上，例如 `My Spotify Stats`。
 
    <img src="docs/images/portal-new-app.png" alt="建立新 app 的視窗" width="380">
 
-2. 在 **General Information** 頁面複製 **Application ID**。
-
-   <img src="docs/images/portal-app-id.png" alt="Application ID 和 Copy 按鈕" width="380">
-3. 打開 **Bot** 頁面，按 **Reset Token**，複製 token。這個 token 只會顯示一次，
+2. 打開 **Bot** 頁面，按 **Reset Token**，複製 token。這個 token 只會顯示一次，
    請當成密碼保管。
 
    <img src="docs/images/portal-bot-token.png" alt="Bot 頁的 Reset Token 按鈕" width="520">
-4. 把 bot 加進你的伺服器：打開 **OAuth2** → **URL Generator**，勾選 `bot`，
+3. 把 bot 加進你的伺服器：打開 **OAuth2** → **URL Generator**，勾選 `bot`，
    權限不用勾。打開最下面產生的連結，選你的伺服器，按 **繼續**，再按 **授權**。
 
    <img src="docs/images/portal-oauth2.png" alt="勾選 bot 的 OAuth2 URL Generator" width="640">
-5. 取得你自己的使用者 ID：在 Discord 打開 **使用者設定**（齒輪圖示）→ **進階**，
-   開啟 **開發者模式**。接著在任何地方對自己的名字按右鍵，選 **複製使用者 ID**。
+
+Application ID 和你的使用者 ID 都不用抄，Worker 會從 bot token 讀出來。
 
 > [!NOTE]
 > bot 要跟你在同一個伺服器裡，而且那個伺服器允許成員傳私訊給你（對伺服器按右鍵 →
 > **隱私設定**），bot 才能私訊你。
 
-### 第 3 步：設定 Cloudflare
+### 第 2 步：按 Deploy to Cloudflare
 
-1. 從終端機登入 Cloudflare。瀏覽器會跳出視窗，按 **Allow**。
+1. 按上面的 **Deploy to Cloudflare** 按鈕。
+2. 登入 Cloudflare，被問到時連結你的 GitHub 帳號。Cloudflare 會在你的 GitHub 帳號裡
+   複製一份這個專案，也會幫你建立資料庫。名稱用它建議的就好。
+3. Cloudflare 會要你填兩個值：
+   - `DISCORD_TOKEN`：第 1 步的 bot token。
+   - `ADMIN_TOKEN`：你的管理密碼。自己想一組至少 32 個字元的隨機字串（可以用密碼管理器產生），
+     之後登入 admin 頁要用它。存進去之後 Cloudflare 不會再顯示，請自己保存好。
+4. 開始部署，等它跑完。資料庫會自動設定好。
+5. Cloudflare 會顯示你的 **Worker 網址**，長得像
+   `https://spotify-discord-stats.your-name.workers.dev`，把它複製起來。之後也可以在
+   Cloudflare 後台的 **Workers & Pages** 找到。新的 `workers.dev` 網址可能要等幾分鐘才會生效。
 
-   ```bash
-   npx wrangler login
-   ```
+### 第 3 步：打開 admin 頁
 
-2. 複製範例檔，做出你自己的設定檔。Windows 請把 `cp` 換成 `copy`，
-   或直接在檔案總管裡複製再改名。
+1. 打開你的 Worker 網址加上 `/admin`，例如
+   `https://spotify-discord-stats.your-name.workers.dev/admin`。
+2. 在 **ADMIN_TOKEN** 欄位貼上管理密碼，按 **登入**。頁面會跟著瀏覽器的語言顯示，
+   右上角的 **中文 / EN** 可以切換。
 
-   ```bash
-   cp wrangler.example.toml wrangler.toml
-   ```
+   <img src="docs/images/admin-login-zh.png" alt="admin 登入頁" width="340">
 
-3. 建立資料庫：
-
-   ```bash
-   npm run cf:d1:create
-   ```
-
-   它會印出一個 `database_id`，是一長串像 `1a2b3c4d-...` 的 ID，把它複製起來。
-4. 用純文字編輯器打開 `wrangler.toml`（Windows 用記事本；macOS 請用 VS Code 這類程式編輯器，
-   因為「文字編輯」會把 `"` 換成彎引號）。把 ID 貼到
-   `database_id = "paste-database-id-here"` 的位置，存檔。
-5. 建立資料表，然後第一次把專案部署上線。如果指令要你確認，輸入 `y` 按 Enter。
-
-   ```bash
-   npm run cf:d1:migrate:remote
-   npm run cf:deploy
-   ```
-
-   如果這是你的第一個 Worker，Wrangler 會請你取一個 `workers.dev` 子網域，
-   取一個還沒被用過的名字就好。新的網址可能要等幾分鐘才會生效。
-6. 部署完會印出你的 **Worker 網址**，長得像
-   `https://spotify-discord-stats.your-name.workers.dev`，把它複製起來。
+因為 Spotify app 還沒設定，頁面會直接打開 **狀態** 分頁，這就是下一步。狀態列表裡的
+**Discord app** 那一行會顯示你的 app ID，以及私訊和 widget 給誰；那個人應該是你。
 
 ### 第 4 步：建立 Spotify app
+
+**狀態** 分頁最上面的 **Spotify app** 區塊會顯示你的 **Redirect URI**，旁邊有 **複製** 按鈕。
+它就是你的 Worker 網址加上 `/spotify/callback`。
 
 1. 打開 [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)，
    登入後按 **Create app**。
 2. 填寫：
    - **App name** 和 **App description**：隨便填，例如 `My Spotify Stats`。
-   - **Redirect URIs**：你的 Worker 網址後面加上 `/spotify/callback`，例如
-     `https://spotify-discord-stats.your-name.workers.dev/spotify/callback`，
-     然後按 **Add**。
+   - **Redirect URIs**：貼上 admin 頁上的 Redirect URI，然後按 **Add**。
    - 問你打算用哪些 API 時，勾選 **Web API**。
 
    <img src="docs/images/spotify-create.png" alt="填好的 Spotify Create app 表單" width="640">
@@ -164,55 +135,20 @@ npm install
    複製 **Client Secret**。
 
    <img src="docs/images/spotify-settings.png" alt="Spotify app 設定頁的 Client ID 和 View client secret" width="640">
+5. 回到 admin 頁，把兩個值貼進 **Spotify app** 區塊，按 **儲存並檢查**。
+   它會先向 Spotify 確認這組值是對的才儲存，打錯字馬上就會知道。
 
 > [!NOTE]
-> 統計的是第 6 步連結時登入的那個 Spotify 帳號，不是建立這個 app 的帳號。兩個可以是同一個；
+> 統計的是第 5 步連結時登入的那個 Spotify 帳號，不是建立這個 app 的帳號。兩個可以是同一個；
 > 如果不同，要先到 **Settings** → **User Management** 把你要登入的那個帳號加進去。
 
-### 第 5 步：填入設定
+### 第 5 步：連結你的 Spotify 帳號
 
-1. 再打開 `wrangler.toml`，把你的值填進 `[vars]` 區塊，引號要保留：
+在 **狀態** 分頁按 **Spotify 重新授權**。（Spotify app 存好之前，這個按鈕是灰的。）
+Spotify 會詢問是否允許讀取你最近播放的歌曲，按 **Agree**。
+看到 **Spotify authorization complete** 就完成了。
 
-   ```toml
-   [vars]
-   DISCORD_CLIENT_ID = "你的 Discord Application ID"
-   DISCORD_USER_ID = "你的 Discord 使用者 ID"
-   SPOTIFY_CLIENT_ID = "你的 Spotify Client ID"
-   SPOTIFY_REDIRECT_URI = "https://spotify-discord-stats.your-name.workers.dev/spotify/callback"
-   PUBLIC_BASE_URL = "https://spotify-discord-stats.your-name.workers.dev"
-   ```
-
-2. 自己想一組管理密碼：至少 32 個字元的隨機字串（可以用密碼管理器產生）。
-   之後登入 admin 頁要用它。
-3. 把三個機密值存進 Cloudflare。每個指令執行後，貼上對應的值再按 Enter。
-   貼上時畫面上不會出現任何字，這是正常的。
-
-   ```bash
-   npx wrangler secret put DISCORD_TOKEN
-   npx wrangler secret put SPOTIFY_CLIENT_SECRET
-   npx wrangler secret put ADMIN_TOKEN
-   ```
-
-   `DISCORD_TOKEN` 是 bot token，`SPOTIFY_CLIENT_SECRET` 是 Spotify Client Secret，
-   `ADMIN_TOKEN` 是你的管理密碼。存進去之後 Cloudflare 不會再顯示，管理密碼請自己保存好。
-4. 再部署一次，讓新設定生效：
-
-   ```bash
-   npm run cf:deploy
-   ```
-
-### 第 6 步：連結你的 Spotify 帳號
-
-1. 打開你的 Worker 網址加上 `/admin`，例如
-   `https://spotify-discord-stats.your-name.workers.dev/admin`。
-2. 在 **ADMIN_TOKEN** 欄位貼上管理密碼，按 **登入**。頁面會跟著瀏覽器的語言顯示，
-   右上角的 **中文 / EN** 可以切換。
-
-   <img src="docs/images/admin-login-zh.png" alt="admin 登入頁" width="340">
-3. 打開 **狀態** 分頁，按 **Spotify 重新授權**。Spotify 會詢問是否允許讀取你最近播放的歌曲，按 **Agree**。
-   看到 **Spotify authorization complete** 就完成了。
-
-### 第 7 步：設定個人檔案 widget
+### 第 6 步：設定個人檔案 widget
 
 自訂 widget 來自 Discord 的實驗功能，所以有一部分設定要用變通的方法。chloecinders 的教學
 [How to Make Discord Widgets](https://chloecinders.com/blog/discord-widgets)（英文）講得很完整，照著它做，再搭配這個專案的兩個捷徑：
@@ -221,7 +157,7 @@ npm install
    打開你的 app，在左邊選單的 **Games** 底下點 **Widget**。
 
    > 如果沒有 **Widget** 這個選項，代表 Discord 沒有開放 widget 編輯器給你的 app
-   > （見最上面的警告）。直接跳到第 8 步，除了 widget 以外都能用。
+   > （見最上面的警告）。直接跳到第 7 步，除了 widget 以外都能用。
 
 2. **捷徑 1**：不用自己一格一格建，打開
    [docs/discord-widget-config.json](docs/discord-widget-config.json)，
@@ -246,7 +182,7 @@ npm install
 
 欄位名稱和細節：[docs/discord-widget.md](docs/discord-widget.md)（英文）。
 
-### 第 8 步：確認有在運作
+### 第 7 步：確認有在運作
 
 1. 在 admin 頁的 **狀態** 分頁按 **立即同步**。**上次操作結果** 底下會顯示
    **抓到 N 筆、新增 N 筆**，以及 widget 有沒有更新。重新整理頁面就能看到最新的預覽。
@@ -256,7 +192,52 @@ npm install
    macOS 是 `Cmd+R`）。
 3. 在 **週報月報** 分頁按 **發送週報**，按確定。幾秒內你應該會收到 bot 寄來的週報私訊。
 
-大功告成。終端機可以關掉了，之後全部在 Cloudflare 上自動執行。
+大功告成。之後全部在 Cloudflare 上自動執行。
+
+## 改從自己的電腦部署
+
+也可以不用 GitHub 和部署按鈕，改從終端機部署。先做完第 1 步，然後：
+
+1. 安裝 [Node.js](https://nodejs.org/) 24 以上。裝好之後開一個新的終端機，執行 `node -v`，
+   確認印出來的是 `v24` 或更新的版本。
+2. 下載專案：在這個頁面按綠色的 **Code** 按鈕，選 **Download ZIP**，再解壓縮。會用 git 的話也可以：
+
+   ```bash
+   git clone https://github.com/956zs/spotify-discord-stats.git
+   ```
+
+3. 在專案資料夾裡開終端機：
+   - **Windows**：用檔案總管打開資料夾，點一下網址列，輸入 `cmd` 按 Enter。請用這個命令提示字元，
+     不要用 PowerShell，它常常會擋下 `npm`，出現「已停用指令碼執行」的錯誤。
+   - **macOS**：在 Finder 對資料夾按右鍵，選 **服務** → **新增位於檔案夾位置的終端機視窗**。
+   - **Linux**：開終端機，`cd` 到資料夾裡。
+4. 安裝需要的套件，並登入 Cloudflare。瀏覽器會跳出視窗，按 **Allow**。
+
+   ```bash
+   npm install
+   npx wrangler login
+   ```
+
+5. 把專案部署上線。這會建立 Worker 和它的資料庫。第一次執行時會問你幾個問題，
+   例如第一個 Worker 要用的 `workers.dev` 子網域，取一個還沒被用過的名字就好。
+   如果它要你確認，輸入 `y` 按 Enter。
+
+   ```bash
+   npm run deploy
+   ```
+
+   部署完會印出你的 **Worker 網址**，把它複製起來。新的網址可能要等幾分鐘才會生效。
+6. 把 bot token 和管理密碼（見第 2 步）存進 Cloudflare。每個指令執行後，貼上對應的值再按 Enter。
+   貼上時畫面上不會出現任何字，這是正常的。
+
+   ```bash
+   npx wrangler secret put DISCORD_TOKEN
+   npx wrangler secret put ADMIN_TOKEN
+   ```
+
+7. 接著做[第 3 步](#第-3-步打開-admin-頁)。
+
+第一次部署會印出 `Creating new D1 Database`，接著建立資料表。之後的部署會用名稱找到同一個資料庫。
 
 ## 選擇 widget 要顯示什麼
 
@@ -300,7 +281,9 @@ widget 最上面的大圖可以在 **大圖** 分頁選：固定素材（`widget
 
 ## 匯入完整的 Spotify 歷史（選用）
 
-Spotify 可以把你所有的播放紀錄寄給你：
+Spotify 可以把你所有的播放紀錄寄給你。匯入要用一台裝了 Node.js 的電腦：先做
+[改從自己的電腦部署](#改從自己的電腦部署)的第 1 到 4 步（如果你用的是部署按鈕，
+請從你自己的 GitHub 帳號下載你那一份專案，不是這一份），但不用執行 `npm run deploy`。
 
 1. 到 [Spotify 隱私設定](https://www.spotify.com/account/privacy/) 申請
    **Extended streaming history**（延伸串流紀錄）。Spotify 會用 email 寄給你，
@@ -340,7 +323,7 @@ Spotify 可以把你所有的播放紀錄寄給你：
 
 **沒有 Premium 的變通方法**：Spotify 只要求 app 的擁有者有 Premium。有 Premium 的人（朋友，或你的方案管理者）
 可以在他的 app 的 **User Management** 加入你的 Spotify email（每個 app 最多 5 人），在 Redirect URIs 加上你的
-Worker 網址加 `/spotify/callback`，再把 app 的 Client ID 和 Client Secret 給你。第 6 步連結 Spotify 時，
+Redirect URI（admin 頁上顯示的那個），再把 app 的 Client ID 和 Client Secret 給你。第 5 步連結 Spotify 時，
 用你自己的帳號登入（先登出對方的帳號）：Worker 記錄的是你連結的那個帳號，不是 app 擁有者的。
 只跟信得過的人這樣做：拿到 Client Secret 的人就能以那個 app 的身分操作，而且擁有者的 Premium 一斷，app 就會停。
 </details>
@@ -356,7 +339,8 @@ Worker 網址加 `/spotify/callback`，再把 app 的 Client ID 和 Client Secre
 <summary><b>需要自己的網域嗎？</b></summary>
 
 不用，免費的 `workers.dev` 網址就能用。想用自己的網域的話，先把網域加到 Cloudflare，
-再把 `wrangler.toml` 裡的 `routes` 取消註解。
+把 `wrangler.toml` 裡的 `routes` 取消註解（用部署按鈕的話，改你 GitHub 上那一份），再部署一次。
+之後用新網址打開 admin 頁，把它顯示的 Redirect URI 加到你的 Spotify app。
 </details>
 
 <details>
@@ -391,39 +375,47 @@ Spotify 的最近播放清單只給每首歌的長度，不是你實際聽了多
 
 可以。修改 [config/app.json](config/app.json) 裡的 `recapReports`，再部署一次：
 `weeklyDay`（0 是星期日，1 是星期一，以此類推）、`monthlyDay`、`sendHour` 和 `sendMinute`（要是 10 的倍數）。
-時間以台灣時間（UTC+8）計算，時區本身目前還不能改。
+時間以台灣時間（UTC+8）計算，時區本身目前還不能改。用部署按鈕的話，改你 GitHub 上那一份，
+存檔後就會重新部署。
 </details>
 
 <details>
 <summary><b>我的資料誰看得到？</b></summary>
 
-聽歌紀錄存在你自己的 Cloudflare 資料庫裡。admin 頁和管理路由都要用你的管理密碼才能進去。
-Spotify 只允許 Worker 讀取你最近播放的歌曲。widget 上顯示的內容，任何打開你 Discord 個人檔案的人都看得到。
+聽歌紀錄、你的 Spotify 連結，以及 Spotify app 的 Client Secret 都存在你自己的 Cloudflare 資料庫裡。
+admin 頁和管理路由都要用你的管理密碼才能進去。Spotify 只允許 Worker 讀取你最近播放的歌曲。
+widget 上顯示的內容，任何打開你 Discord 個人檔案的人都看得到。
 </details>
 
 <details>
 <summary><b>要怎麼整個移除？</b></summary>
 
-1. 刪掉 Worker 和它的資料庫：
-
-   ```bash
-   npx wrangler delete
-   npx wrangler d1 delete spotify-discord-stats
-   ```
-
-2. 到 [spotify.com/account/apps](https://www.spotify.com/account/apps/) 移除這個 app 的存取權，
+1. 在 [Cloudflare 後台](https://dash.cloudflare.com/) 刪掉 Worker（在 **Workers & Pages** 裡）
+   和它的 D1 資料庫。也可以在專案資料夾的終端機執行 `npx wrangler delete` 刪掉 Worker。
+2. 如果用的是部署按鈕，把你 GitHub 上那一份專案刪掉。
+3. 到 [spotify.com/account/apps](https://www.spotify.com/account/apps/) 移除這個 app 的存取權，
    再到 Spotify Developer Dashboard 刪掉 app。
-3. 把 widget 從 Discord 個人檔案移除，再到 Discord Developer Portal 刪掉 app。
+4. 把 widget 從 Discord 個人檔案移除，再到 Discord Developer Portal 刪掉 app。
 </details>
 
 ## 疑難排解
 
+要改 `DISCORD_TOKEN` 或 `ADMIN_TOKEN` 這類機密值，到 Cloudflare 後台打開你的 Worker →
+**Settings** → **Variables and Secrets**，或在專案資料夾執行 `npx wrangler secret put 名稱`。
+
 <details>
 <summary><b>Spotify 顯示 <code>INVALID_CLIENT: Invalid redirect URI</code></b></summary>
 
-Spotify 後台的 Redirect URI 和 `wrangler.toml` 裡的 `SPOTIFY_REDIRECT_URI` 必須完全一樣，
-包含 `https://`，結尾也不能多一個斜線。改正錯的那一邊；如果改的是 `wrangler.toml`，
-再跑一次 `npm run cf:deploy`。
+Spotify 後台的 Redirect URI 必須和 admin 頁上顯示的完全一樣，包含 `https://`，結尾也不能多一個斜線。
+要再看一次，在 **狀態** 分頁的 **Spotify app** 區塊按 **更換**（看完按 **取消**）。
+Redirect URI 跟著你打開 admin 頁用的網址走；如果你會用不只一個網址（例如 `workers.dev` 和自己的網域），
+每個網址的 Redirect URI 都要加到 Spotify app。
+</details>
+
+<details>
+<summary><b>儲存並檢查時說 Client ID 或 Client Secret 不對</b></summary>
+
+到 Spotify app 的 **Settings** 重新複製兩個值。兩個都是 32 個英數字。
 </details>
 
 <details>
@@ -436,8 +428,8 @@ Spotify 後台的 Redirect URI 和 `wrangler.toml` 裡的 `SPOTIFY_REDIRECT_URI`
 <details>
 <summary><b>widget 沒有更新，或 admin 頁警告 widget 推送失敗</b></summary>
 
-- 確認 widget 已經加到你的個人檔案（第 7 步），而且 `DISCORD_CLIENT_ID` 是擁有這個 widget
-  的 app 的 Application ID。
+- 確認 widget 已經加到你的個人檔案（第 6 步），而且跟 bot token 屬於同一個 Discord app。
+  **狀態** 分頁的 **Discord app** 那一行會顯示這個 app 的 ID。
 - 同步後 admin 頁的 **狀態** 分頁會在 **上次操作結果** 用黃字顯示失敗原因；聽歌紀錄照樣會存，回顧也照常寄出。
 
   <img src="docs/images/admin-sync-warn-zh.png" alt="widget 推送失敗的警告" width="440">
@@ -453,30 +445,62 @@ Spotify 後台的 Redirect URI 和 `wrangler.toml` 裡的 `SPOTIFY_REDIRECT_URI`
 
 - 確認 bot 在一個你也在的伺服器裡。
 - 在那個伺服器允許成員傳私訊（對伺服器按右鍵 → **隱私設定**）。
-- 確認 `DISCORD_USER_ID` 填的是你的使用者 ID，不是 Application ID。
-- 確認 bot token 是最新的。在 Developer Portal 重設 token 後舊的就失效了，要再跑一次
-  `npx wrangler secret put DISCORD_TOKEN`。
+- 看 **狀態** 分頁的 **Discord app** 那一行，它會顯示私訊寄給誰，也就是 Discord app 的擁有者
+  （app 屬於團隊的話是團隊擁有者）。要改寄給別人，設定 `DISCORD_USER_ID`（私訊和 widget）
+  或 `DISCORD_REMINDER_USER_ID`（只有私訊），見
+  [docs/cloudflare-worker.md](docs/cloudflare-worker.md#optional-settings)（英文）。
+- 如果那一行寫 **從 bot token 讀不到 app**，代表 bot token 不對或被重設了。在 Developer Portal
+  重設 token 後舊的就失效了，要把新的存成 `DISCORD_TOKEN`。
 </details>
 
 <details>
 <summary><b>admin 頁登入失敗（<code>Token 不正確</code>）</b></summary>
 
-輸入的密碼跟 `ADMIN_TOKEN` 不一樣。忘記的話，用 `npx wrangler secret put ADMIN_TOKEN`
-設一組新的。
+輸入的密碼跟 `ADMIN_TOKEN` 不一樣。忘記的話，把一組新的存成 `ADMIN_TOKEN`。
 </details>
 
 ## 更新版本
 
-下載新版（或 `git pull`）。如果是下載 ZIP，記得把舊資料夾裡的 `wrangler.toml`
-複製到新資料夾。接著執行：
+更新時，你的機密值、設定和資料都會保留。每次部署也會先套用新的資料庫變更。
+
+**用部署按鈕的話**：你的專案在你自己 GitHub 上的那一份，它一有變動，Cloudflare 就會重新部署
+（Workers Builds）。在那裡把新版本拉進來：
+
+- 如果你那一份是這個專案的 fork，在 GitHub 上打開它，按 **Sync fork**。
+- 如果是一般的複本（沒有 **Sync fork** 按鈕），用 git 把這個專案的變更拉下來，再推到你那一份：
+
+  ```bash
+  git pull https://github.com/956zs/spotify-discord-stats.git main
+  git push
+  ```
+
+推到你那一份之後就會開始新的建置和部署，可以在 Cloudflare 後台你的 Worker 頁面上看進度。
+
+**從自己電腦部署的話**：下載新版（或 `git pull`），然後執行：
 
 ```bash
 npm install
-npm run cf:d1:migrate:remote
-npm run cf:deploy
+npm run deploy
 ```
 
-你的機密值、設定和資料都會保留。
+如果你有自己的 `wrangler.local.toml`，而且是下載 ZIP 更新，記得把它從舊資料夾複製到新資料夾。
+
+### 從舊版設定升級
+
+如果你是在有部署按鈕之前就設定好的，什麼都不用改：你在 Cloudflare 設定的值（`wrangler.toml`
+裡的 `[vars]` 和你的機密值）照樣有效，而且永遠優先於 Worker 自己找到的值。這時 **Spotify app**
+區塊會寫這個 app 設定在 Cloudflare。
+
+現在專案本身就附了 `wrangler.toml`，所以你自己那份沒有被 git 追蹤的檔案會擋住 `git pull`。
+請先把它改名成 `wrangler.local.toml`；所有 npm 指令在有 `wrangler.local.toml` 時都會用它。接著：
+
+```bash
+git pull
+npm install
+npm run deploy
+```
+
+下載 ZIP 的話：把舊的 `wrangler.toml` 複製到新資料夾，改名成 `wrangler.local.toml`。
 
 ## 更多文件
 
@@ -484,7 +508,7 @@ npm run cf:deploy
 
 - [Admin 頁](docs/admin-page.md)：所有設定、統計項目和管理路由。
 - [Discord 個人檔案 widget](docs/discord-widget.md)：欄位名稱，以及 widget 怎麼被更新。
-- [Cloudflare Worker 部署](docs/cloudflare-worker.md)：上面設定步驟的參考版。
+- [Cloudflare Worker 部署](docs/cloudflare-worker.md)：上面設定步驟的參考版，以及所有可以覆寫的設定。
 - [備份、還原與歷史匯入](docs/backup-rollback-and-import.md)
 - [在自己的伺服器上跑](docs/vps-deployment.md)：用 Node.js + SQLite 取代 Cloudflare 的做法，
   不會自動寄週報、月報。
@@ -498,7 +522,7 @@ npm run cf:deploy
 - `worker/`：Cloudflare Worker（路由、D1 存取、Spotify、Discord、統計、回顧寄送）。
 - `shared/`：不綁執行環境的共用程式（時間、key、播放紀錄解析、統計項目、回顧排版）。
 - `src/`：Node.js + SQLite 版本，給本機開發和自架伺服器用。
-- `scripts/`：D1 備份和歷史匯入工具。
+- `scripts/`：部署、Wrangler 包裝、D1 備份和歷史匯入工具。
 - `migrations/`：D1 資料表 migration。
 - `config/`：預設的 app 和 widget 設定。
 - `test/`：Node 測試。
@@ -510,8 +534,16 @@ npm test
 find src worker shared scripts test -name '*.js' -print0 | xargs -0 -n 1 node --check
 ```
 
-要在本機跑 Worker：先把 migration 套到本機資料庫，把機密值（`DISCORD_TOKEN`、
-`SPOTIFY_CLIENT_SECRET`、`ADMIN_TOKEN`）以 `NAME=value` 一行一個寫進 `.dev.vars`，再啟動：
+專案附的 [wrangler.toml](wrangler.toml) 裡沒有任何 ID，部署按鈕可以直接用。個人設定（account ID、
+自己的網域、資料庫 ID、`[vars]`）請放在 `wrangler.local.toml`（已加入 gitignore），可以從
+`wrangler.toml` 複製一份開始。所有會跑 Wrangler 的 npm 指令（`npm run deploy`、`cf:dev`、
+`cf:d1:migrate:*`、`cf:d1:backup:*`、`cf:import`）在它存在時都會用它；其他 Wrangler 指令可以用
+`npm run cf -- <wrangler 參數>` 以同樣方式執行。D1 指令用 binding 名稱 `DB` 指定資料庫。
+`npm run deploy` 會先套用 migration 再部署；資料庫還不存在時，會先部署讓 Wrangler 建立資料庫，再套用 migration。
+
+要在本機跑 Worker：把 [.dev.vars.example](.dev.vars.example) 複製成 `.dev.vars`，填入
+`DISCORD_TOKEN` 和 `ADMIN_TOKEN`。Spotify app 可以在 admin 頁輸入，或把 `SPOTIFY_CLIENT_ID`
+和 `SPOTIFY_CLIENT_SECRET` 寫進 `.dev.vars`。接著把 migration 套到本機資料庫，再啟動：
 
 ```bash
 npm run cf:d1:migrate:local
@@ -519,7 +551,8 @@ npm run cf:dev
 ```
 
 Node/SQLite 的指令（`npm run spotify:auth-url`、`spotify:token`、`spotify:sync`、`npm start`）
-會讀 `.env`，可以從 [.env.example](.env.example) 複製一份開始。
+會讀 `.env`，可以從 [node.env.example](node.env.example) 複製成 `.env` 開始。這個版本不會自己找任何值，
+Discord 和 Spotify 的值都要填在裡面。
 
 已知限制：
 
