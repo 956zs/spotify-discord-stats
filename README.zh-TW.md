@@ -42,7 +42,7 @@
 
 - **Spotify Premium。** 從 2026 年 2 月起，Spotify 規定要有 Premium 才能使用開發者 app
   （也就是這裡要建立的那種）。
-- **Discord 帳號**，以及一個你有權限加 bot 的伺服器。自己開一個空的伺服器就行，免費。
+- **Discord 帳號。**
 - **免費的 [Cloudflare](https://dash.cloudflare.com/sign-up) 帳號。** 程式就跑在這裡。
 - **免費的 [GitHub](https://github.com/signup) 帳號。** 部署按鈕會把這個專案複製一份到你的帳號裡。
   用 GitLab 帳號也可以。
@@ -56,7 +56,6 @@
 | 值 | 在哪一步拿到 |
 | --- | --- |
 | Discord bot token（不能外流） | 第 1 步 |
-| 管理密碼（不能外流，自己想一個） | 第 2 步 |
 | Spotify Client ID | 第 4 步 |
 | Spotify Client Secret（不能外流） | 第 4 步 |
 
@@ -80,26 +79,15 @@ Worker 會把私訊寄給 app 的擁有者，也是更新他的 widget。
    請當成密碼保管。
 
    <img src="docs/images/portal-bot-token.png" alt="Bot 頁的 Reset Token 按鈕" width="520">
-3. 把 bot 加進你的伺服器：打開 **OAuth2** → **URL Generator**，勾選 `bot`，
-   權限不用勾。打開最下面產生的連結，選你的伺服器，按 **繼續**，再按 **授權**。
-
-   <img src="docs/images/portal-oauth2.png" alt="勾選 bot 的 OAuth2 URL Generator" width="640">
-
-Application ID 和你的使用者 ID 都不用抄，Worker 會從 bot token 讀出來。
-
-> [!NOTE]
-> bot 要跟你在同一個伺服器裡，而且那個伺服器允許成員傳私訊給你（對伺服器按右鍵 →
-> **隱私設定**），bot 才能私訊你。
+Application ID 和你的使用者 ID 都不用抄，Worker 會從 bot token 讀出來。也不用把 bot 加進伺服器：
+第 3 步會把 app 加到你自己的帳號，bot 就能私訊你。
 
 ### 第 2 步：按 Deploy to Cloudflare
 
 1. 按上面的 **Deploy to Cloudflare** 按鈕。
 2. 登入 Cloudflare，被問到時連結你的 GitHub 帳號。Cloudflare 會在你的 GitHub 帳號裡
    複製一份這個專案，也會幫你建立資料庫。名稱用它建議的就好。
-3. Cloudflare 會要你填兩個值：
-   - `DISCORD_TOKEN`：第 1 步的 bot token。
-   - `ADMIN_TOKEN`：你的管理密碼。自己想一組至少 32 個字元的隨機字串（可以用密碼管理器產生），
-     之後登入 admin 頁要用它。存進去之後 Cloudflare 不會再顯示，請自己保存好。
+3. Cloudflare 只會要你填一個值 `DISCORD_TOKEN`：貼上第 1 步的 bot token。
 4. 開始部署，等它跑完。資料庫會自動設定好。
 5. Cloudflare 會顯示你的 **Worker 網址**，長得像
    `https://spotify-discord-stats.your-name.workers.dev`，把它複製起來。之後也可以在
@@ -107,12 +95,23 @@ Application ID 和你的使用者 ID 都不用抄，Worker 會從 bot token 讀�
 
 ### 第 3 步：打開 admin 頁
 
-1. 打開你的 Worker 網址加上 `/admin`，例如
-   `https://spotify-discord-stats.your-name.workers.dev/admin`。
-2. 在 **ADMIN_TOKEN** 欄位貼上管理密碼，按 **登入**。頁面會跟著瀏覽器的語言顯示，
-   右上角的 **中文 / EN** 可以切換。
+不用密碼：bot 會私訊你一個登入連結。
 
-   <img src="docs/images/admin-login-zh.png" alt="admin 登入頁" width="340">
+1. 打開你的 Worker 網址加上 `/admin`，例如
+   `https://spotify-discord-stats.your-name.workers.dev/admin`。頁面會跟著瀏覽器的語言顯示，
+   右上角的 **中文 / EN** 可以切換。
+2. 按 **加到我的應用程式**，把這個 app 加到你的 Discord 帳號，bot 才能私訊你。這只要做一次。
+3. 按 **寄登入連結給我**。bot 會私訊你一個連結，打開後按 **登入**。同一個瀏覽器會保持登入 30 天。
+
+   <img src="docs/images/admin-login-zh.png" alt="登入頁，有「加到我的應用程式」和「寄登入連結給我」" width="380">
+
+連結 10 分鐘內有效、只能用一次，而且只有最新的那個有效。每分鐘最多可以再要一次。
+
+> [!NOTE]
+> 如果沒收到私訊，確認你已經加過 app（**加到我的應用程式**），而且允許它私訊你。
+> 如果 Discord 說這個 app 不能加到你的帳號，到 Developer Portal 打開 app → **Installation**，
+> 勾選 **User Install**（新的 app 預設就有勾）。也可以改成把 bot 加進一個你也在的伺服器：
+> **OAuth2** → **URL Generator**，勾選 `bot`，打開產生的連結，選那個伺服器。
 
 因為 Spotify app 還沒設定，頁面會直接打開 **狀態** 分頁，這就是下一步。狀態列表裡的
 **Discord app** 那一行會顯示你的 app ID，以及私訊和 widget 給誰；那個人應該是你。
@@ -227,12 +226,11 @@ Spotify 會詢問是否允許讀取你最近播放的歌曲，按 **Agree**。
    ```
 
    部署完會印出你的 **Worker 網址**，把它複製起來。新的網址可能要等幾分鐘才會生效。
-6. 把 bot token 和管理密碼（見第 2 步）存進 Cloudflare。每個指令執行後，貼上對應的值再按 Enter。
+6. 把 bot token 存進 Cloudflare。執行這個指令，貼上 token 再按 Enter。
    貼上時畫面上不會出現任何字，這是正常的。
 
    ```bash
    npx wrangler secret put DISCORD_TOKEN
-   npx wrangler secret put ADMIN_TOKEN
    ```
 
 7. 接著做[第 3 步](#第-3-步打開-admin-頁)。
@@ -383,7 +381,7 @@ Spotify 的最近播放清單只給每首歌的長度，不是你實際聽了多
 <summary><b>我的資料誰看得到？</b></summary>
 
 聽歌紀錄、你的 Spotify 連結，以及 Spotify app 的 Client Secret 都存在你自己的 Cloudflare 資料庫裡。
-admin 頁和管理路由都要用你的管理密碼才能進去。Spotify 只允許 Worker 讀取你最近播放的歌曲。
+只有你能登入 admin 頁：登入連結只會私訊給你。Spotify 只允許 Worker 讀取你最近播放的歌曲。
 widget 上顯示的內容，任何打開你 Discord 個人檔案的人都看得到。
 </details>
 
@@ -400,7 +398,7 @@ widget 上顯示的內容，任何打開你 Discord 個人檔案的人都看得�
 
 ## 疑難排解
 
-要改 `DISCORD_TOKEN` 或 `ADMIN_TOKEN` 這類機密值，到 Cloudflare 後台打開你的 Worker →
+要改 `DISCORD_TOKEN` 這類機密值，到 Cloudflare 後台打開你的 Worker →
 **Settings** → **Variables and Secrets**，或在專案資料夾執行 `npx wrangler secret put 名稱`。
 
 <details>
@@ -443,8 +441,9 @@ Redirect URI 跟著你打開 admin 頁用的網址走；如果你會用不只一
 <details>
 <summary><b>收不到週報／月報私訊</b></summary>
 
-- 確認 bot 在一個你也在的伺服器裡。
-- 在那個伺服器允許成員傳私訊（對伺服器按右鍵 → **隱私設定**）。
+- 確認你已經把 app 加到自己的帳號（登入頁或 **狀態** 分頁 **Discord app** 那一行的
+  **加到我的應用程式**），或是 bot 在一個你也在的伺服器裡，而且那個伺服器允許成員傳私訊
+  （對伺服器按右鍵 → **隱私設定**）。
 - 看 **狀態** 分頁的 **Discord app** 那一行，它會顯示私訊寄給誰，也就是 Discord app 的擁有者
   （app 屬於團隊的話是團隊擁有者）。要改寄給別人，設定 `DISCORD_USER_ID`（私訊和 widget）
   或 `DISCORD_REMINDER_USER_ID`（只有私訊），見
@@ -454,9 +453,12 @@ Redirect URI 跟著你打開 admin 頁用的網址走；如果你會用不只一
 </details>
 
 <details>
-<summary><b>admin 頁登入失敗（<code>Token 不正確</code>）</b></summary>
+<summary><b>收不到登入連結，或連結說已經失效</b></summary>
 
-輸入的密碼跟 `ADMIN_TOKEN` 不一樣。忘記的話，把一組新的存成 `ADMIN_TOKEN`。
+- **bot 沒辦法私訊你**：在登入頁按 **加到我的應用程式** 把 app 加進來，允許它私訊你，再試一次。
+  其他做法見[第 3 步](#第-3-步打開-admin-頁)的說明。
+- **這個連結已經失效**：連結用過了、超過 10 分鐘，或被新的連結取代。再寄一次就好。
+- **從 DISCORD_TOKEN 讀不到 Discord app**：bot token 不對或被重設了，把現在的 token 存成 `DISCORD_TOKEN`。
 </details>
 
 ## 更新版本
@@ -502,6 +504,9 @@ npm run deploy
 
 下載 ZIP 的話：把舊的 `wrangler.toml` 複製到新資料夾，改名成 `wrangler.local.toml`。
 
+你的 `ADMIN_TOKEN` 也照樣能用：登入頁還是有密碼欄位（在 **或用 ADMIN_TOKEN 登入** 下面），
+提醒私訊裡的連結也還是會直接打開 Spotify 重新授權。你也可以改用新的登入連結。
+
 ## 更多文件
 
 以下文件目前只有英文：
@@ -542,7 +547,7 @@ find src worker shared scripts test -name '*.js' -print0 | xargs -0 -n 1 node --
 `npm run deploy` 會先套用 migration 再部署；資料庫還不存在時，會先部署讓 Wrangler 建立資料庫，再套用 migration。
 
 要在本機跑 Worker：把 [.dev.vars.example](.dev.vars.example) 複製成 `.dev.vars`，填入
-`DISCORD_TOKEN` 和 `ADMIN_TOKEN`。Spotify app 可以在 admin 頁輸入，或把 `SPOTIFY_CLIENT_ID`
+`DISCORD_TOKEN`。私訊登入連結指向本機網址也能用；想用密碼登入的話，再加上 `ADMIN_TOKEN`。Spotify app 可以在 admin 頁輸入，或把 `SPOTIFY_CLIENT_ID`
 和 `SPOTIFY_CLIENT_SECRET` 寫進 `.dev.vars`。接著把 migration 套到本機資料庫，再啟動：
 
 ```bash

@@ -48,8 +48,7 @@ no server of your own.
 
 - **Spotify Premium.** Since February 2026, Spotify requires Premium to use a
   developer app like the one you create here.
-- **A Discord account** and a server where you can add a bot. Your own empty
-  server works; creating one is free.
+- **A Discord account.**
 - **A free [Cloudflare](https://dash.cloudflare.com/sign-up) account.** This is
   where the project runs.
 - **A free [GitHub](https://github.com/signup) account.** The Deploy button
@@ -66,7 +65,6 @@ them there as you go:
 | Value | You get it in |
 | --- | --- |
 | Discord bot token (keep secret) | Step 1 |
-| Admin password (keep secret, you make it up) | Step 2 |
 | Spotify Client ID | Step 4 |
 | Spotify Client Secret (keep secret) | Step 4 |
 
@@ -93,18 +91,9 @@ updates the widget of, the account that owns the app.
    shows it only once. Treat it like a password.
 
    <img src="docs/images/portal-bot-token.png" alt="Reset Token button on the Bot page" width="520">
-3. Add the bot to your server: open **OAuth2** → **URL Generator** and tick
-   the `bot` scope. No permissions are needed. Open the generated link at the
-   bottom, pick your server, then click **Continue** and **Authorize**.
-
-   <img src="docs/images/portal-oauth2.png" alt="OAuth2 URL Generator with the bot scope ticked" width="640">
-
 You don't need the Application ID or your user ID. The Worker reads both from
-the bot token.
-
-> [!NOTE]
-> The bot can only DM you if you share a server with it and that server allows
-> DMs from members (right-click the server → **Privacy Settings**).
+the bot token. You don't need to add the bot to a server either: in Step 3 you
+add the app to your own account, so the bot can DM you.
 
 ### Step 2: Click Deploy to Cloudflare
 
@@ -112,12 +101,8 @@ the bot token.
 2. Sign in to Cloudflare, and connect your GitHub account when asked.
    Cloudflare makes a copy of this project in your GitHub account and creates
    the database for you. You can keep the suggested names.
-3. Cloudflare asks for two values:
-   - `DISCORD_TOKEN`: the bot token from Step 1.
-   - `ADMIN_TOKEN`: your admin password. Make up a long random string of at
-     least 32 characters (a password manager can generate one). You use it to
-     sign in to the admin page. Cloudflare never shows it again, so keep it
-     somewhere safe.
+3. Cloudflare asks for one value, `DISCORD_TOKEN`: paste the bot token from
+   Step 1.
 4. Start the deploy and wait for it to finish. It sets up the database by
    itself.
 5. Cloudflare shows your **Worker URL**, something like
@@ -127,13 +112,29 @@ the bot token.
 
 ### Step 3: Open the admin page
 
-1. Open your Worker URL followed by `/admin`, for example
-   `https://spotify-discord-stats.your-name.workers.dev/admin`.
-2. Paste your admin password into the **ADMIN_TOKEN** box and click
-   **Sign in**. The page follows your browser's language; use the **中文 / EN**
-   switch in the header to change it.
+There is no password: the bot DMs you a sign-in link.
 
-   <img src="docs/images/admin-login.png" alt="Admin sign-in page" width="340">
+1. Open your Worker URL followed by `/admin`, for example
+   `https://spotify-discord-stats.your-name.workers.dev/admin`. The page
+   follows your browser's language; use the **中文 / EN** switch in the header
+   to change it.
+2. Click **Add to My Apps** and add the app to your Discord account. This lets
+   the bot DM you. You only do this once.
+3. Click **Send me a sign-in link**. Your bot DMs you a link. Open it and click
+   **Sign in**. You stay signed in for 30 days in that browser.
+
+   <img src="docs/images/admin-login.png" alt="Sign-in page with Add to My Apps and Send me a sign-in link" width="380">
+
+The link works once, for 10 minutes, and only the newest link works. You can
+ask for a new one once a minute.
+
+> [!NOTE]
+> If the DM does not arrive, check that you added the app (**Add to My Apps**)
+> and that you allow DMs from it. If Discord says the app can't be added to
+> your account, open the app in the Developer Portal → **Installation** and
+> tick **User Install** (it is on by default for new apps). You can also add
+> the bot to a server you are in instead: **OAuth2** → **URL Generator**, tick
+> the `bot` scope, open the generated link, and pick the server.
 
 The page opens on the **Status** tab, because the Spotify app is not set up
 yet. That is the next step. The **Discord app** line in the status list shows
@@ -273,13 +274,12 @@ Do Step 1 first, then:
 
    It prints your **Worker URL**. Copy it. A brand-new address can take a few
    minutes to start working.
-6. Save the bot token and your admin password (see Step 2) in Cloudflare. Run
-   each command, then paste the value when it asks and press Enter. Nothing
-   appears while you paste; that is normal.
+6. Save the bot token in Cloudflare. Run this command, then paste the token
+   when it asks and press Enter. Nothing appears while you paste; that is
+   normal.
 
    ```bash
    npx wrangler secret put DISCORD_TOKEN
-   npx wrangler secret put ADMIN_TOKEN
    ```
 
 7. Continue with [Step 3](#step-3-open-the-admin-page).
@@ -464,8 +464,8 @@ button, edit the file in your GitHub copy; saving it there deploys again.
 <summary><b>Who can see my data?</b></summary>
 
 Your plays, your Spotify connection, and your Spotify app's Client Secret are
-stored in your own Cloudflare database. The admin page and its routes need
-your admin password. Spotify only lets the Worker read your recently played
+stored in your own Cloudflare database. Only you can sign in to the admin
+page: the sign-in link goes to your Discord DMs. Spotify only lets the Worker read your recently played
 songs. Anyone who opens your Discord profile sees what the widget shows.
 </details>
 
@@ -484,7 +484,7 @@ songs. Anyone who opens your Discord profile sees what the widget shows.
 
 ## Troubleshooting
 
-To change a secret such as `DISCORD_TOKEN` or `ADMIN_TOKEN`, open your Worker
+To change a secret such as `DISCORD_TOKEN`, open your Worker
 in the Cloudflare dashboard → **Settings** → **Variables and Secrets**, or run
 `npx wrangler secret put NAME` from the project folder.
 
@@ -535,9 +535,10 @@ in the Spotify app settings.
 <details>
 <summary><b>No recap DM arrives</b></summary>
 
-- Make sure the bot is in a server you are also in.
-- In that server, allow DMs from members (right-click the server →
-  **Privacy Settings**).
+- Make sure you added the app to your account (**Add to My Apps** on the
+  sign-in page, or on the **Discord app** line of the **Status** tab), or that
+  the bot is in a server you are in and that server allows DMs from members
+  (right-click the server → **Privacy Settings**).
 - Check the **Discord app** line on the **Status** tab. It shows the user the
   DMs go to. That is the owner of the Discord app (for an app that belongs to
   a team, the team owner). To send them to someone else, set
@@ -549,10 +550,15 @@ in the Spotify app settings.
 </details>
 
 <details>
-<summary><b>The admin page rejects my password (<code>Wrong token</code>)</b></summary>
+<summary><b>The sign-in link does not arrive, or says it no longer works</b></summary>
 
-The password does not match `ADMIN_TOKEN`. If you lost it, set a new one as
-`ADMIN_TOKEN`.
+- **The bot could not DM you:** add the app with **Add to My Apps** on the
+  sign-in page, allow DMs from it, and try again. See the note in
+  [Step 3](#step-3-open-the-admin-page) for the other options.
+- **This link no longer works:** the link was used, is older than 10 minutes,
+  or a newer link replaced it. Send a new one.
+- **Could not read the Discord app from DISCORD_TOKEN:** the bot token is
+  wrong or was reset. Save the current one as `DISCORD_TOKEN`.
 </details>
 
 ## Updating
@@ -608,6 +614,10 @@ npm run deploy
 ZIP users: copy your old `wrangler.toml` into the new folder as
 `wrangler.local.toml`.
 
+Your `ADMIN_TOKEN` keeps working too: the sign-in page still has the password
+form (under **or sign in with ADMIN_TOKEN**), and reminder DMs still link
+straight to the Spotify reconnect page. You can also use the new sign-in link.
+
 ## More docs
 
 - [Admin page](docs/admin-page.md): every setting, stat, and admin route.
@@ -654,7 +664,9 @@ same way. The D1 scripts address the database by its binding name `DB`.
 not exist yet, it deploys first so Wrangler creates it, then migrates.
 
 To run the Worker locally, copy [.dev.vars.example](.dev.vars.example) to
-`.dev.vars` and fill in `DISCORD_TOKEN` and `ADMIN_TOKEN`. Enter the Spotify
+`.dev.vars` and fill in `DISCORD_TOKEN`. The DM sign-in link works for a
+local address too; add `ADMIN_TOKEN` if you would rather sign in with a
+password. Enter the Spotify
 app on the admin page, or put `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`
 in `.dev.vars`. Then apply the migrations to a local database and start it:
 
