@@ -189,8 +189,36 @@ function recapPane(t) {
 </section>`;
 }
 
+// The Spotify app inputs belong to their own form (form="spotifyAppForm"), so Enter
+// saves the app instead of the widget settings, and readForm() never sees them.
+function spotifyAppPanel(t) {
+  return `<div class="panel stack" id="spotifyAppPanel">
+    <div class="panel-h"><h2 data-i18n="setup.title">${t('setup.title')}</h2>${tx(t, 'setup.hint', 'p', 'class="hint" id="spotifyAppHint"')}</div>
+    <p id="spotifyAppDone" class="done-line gone">${icon('check')}<span id="spotifyAppDoneText"></span><button type="button" class="btn ghost sm" id="spotifyAppChangeBtn">${tx(t, 'setup.change')}</button></p>
+    <p id="spotifyAppCloudflare" class="hint gone">${tx(t, 'setup.cloudflare')}</p>
+    <div id="spotifyAppSteps" class="stack">
+      <ol class="steps">
+        <li>${tx(t, 'setup.step1')} <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer">${icon('external')} ${tx(t, 'setup.dashboard')}</a></li>
+        <li>${tx(t, 'setup.step2')}
+          <span class="copyline"><code id="spotifyRedirectUri"></code><button type="button" class="btn sm" id="spotifyRedirectCopyBtn">${tx(t, 'setup.copy')}</button></span></li>
+        <li>${tx(t, 'setup.step3')}</li>
+      </ol>
+      <div class="grid2" id="spotifyAppFields">
+        <label class="field">${tx(t, 'setup.clientId', 'span', 'class="lab"')}<input class="inp mono" form="spotifyAppForm" name="clientId" maxlength="64" autocomplete="off" spellcheck="false" required></label>
+        <label class="field">${tx(t, 'setup.clientSecret', 'span', 'class="lab"')}<input class="inp mono" form="spotifyAppForm" name="clientSecret" type="password" maxlength="64" autocomplete="off" spellcheck="false" required></label>
+      </div>
+      <div class="actions">
+        <button type="submit" form="spotifyAppForm" class="btn primary" id="spotifyAppSaveBtn">${icon('check')}${tx(t, 'setup.save')}</button>
+        <button type="button" class="btn ghost gone" id="spotifyAppCancelBtn">${tx(t, 'setup.cancel')}</button>
+      </div>
+      <div id="spotifyAppStatus" class="status" role="status" aria-live="polite"></div>
+    </div>
+  </div>`;
+}
+
 function statusPane(t) {
   return `<section class="pane" id="pane-status" role="tabpanel" aria-labelledby="tab-status" tabindex="0" hidden>
+  ${spotifyAppPanel(t)}
   <div class="panel stack">
     <div class="panel-h"><h2 data-i18n="status.title">${t('status.title')}</h2></div>
     <dl class="kv" id="statusList"></dl>
@@ -303,6 +331,7 @@ ${heroPane(t, templatePath)}
 ${recapPane(t)}
 ${statusPane(t)}
   </form>
+  <form id="spotifyAppForm" novalidate hidden></form>
 ${preview(t)}
 </main>
 ${saveBar(t)}

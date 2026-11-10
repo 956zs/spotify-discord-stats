@@ -45,7 +45,7 @@ code { background:var(--input); padding:1px 6px; border-radius:var(--r1); color:
 .btn.lg { height:40px; padding:0 18px; }
 .btn.icon { width:32px; padding:0; } .btn.icon.sm { width:28px; }
 .btn.wide { width:100%; }
-.btn:disabled { opacity:.45; cursor:default; }
+.btn:disabled, a.btn.off { opacity:.45; cursor:default; }
 .btn:disabled:hover { background:#4e5058; } .btn.ghost:disabled:hover, .btn.danger-ghost:disabled:hover { background:transparent; } .btn.primary:disabled:hover { background:var(--accent); }
 
 /* fields */
@@ -187,6 +187,11 @@ html { scroll-padding-top:64px; scroll-padding-bottom:calc(var(--savebar-h) + 16
 .remind .row { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-top:8px; }
 .remind.done { border-color:var(--line); background:var(--bg2); padding:6px 12px; }
 .done-line { display:flex; gap:8px; align-items:center; flex-wrap:wrap; color:var(--muted); font-size:12px; }
+.steps { margin:0; padding-left:20px; color:var(--text2); font-size:13px; }
+.steps li + li { margin-top:8px; }
+.copyline { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px; }
+.copyline code { word-break:break-all; }
+#spotifyAppSteps > * + * { margin-top:16px; }
 .cb { display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:14px; color:var(--text2); }
 .cb input { width:18px; height:18px; margin:0; accent-color:var(--accent); cursor:pointer; }
 .upload { display:grid; grid-template-columns:132px minmax(0,1fr); gap:16px; padding:12px; border-radius:var(--r2); background:var(--bg2); border:1px solid var(--line-soft); }

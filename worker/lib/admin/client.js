@@ -92,6 +92,8 @@ let albumImageUrl = null;
 let discordClientId = null;
 let recapSchedule = null;
 let statusData = null;
+let setupData = null;
+let spotifyAppEditing = false;
 let heroStepsOpen = false;
 let crop = null;
 let cropFrame = 0;
@@ -1177,8 +1179,103 @@ function renderStatus(status) {
   } else {
     row('status.lastPushed', '—');
   }
+  const discordApp = setupData?.discordApp;
+  if (discordApp?.applicationId) {
+    row('status.discordApp', t('status.discordAppValue', { app: discordApp.applicationId, user: discordApp.userId || '—' }));
+  } else if (setupData) {
+    row('status.discordApp', element('span', { className: 'note bad', textContent: t('status.discordAppMissing') }));
+  }
   $('reauthHint').textContent = t('status.reauthHint', { days: spotify.validDays, remind: spotify.remindDays });
 }
+
+// ---- Spotify app setup ----
+
+function spotifyAppReady() {
+  return Boolean(setupData?.spotifyApp?.configured);
+}
+
+function renderSetup() {
+  if (!setupData) return;
+  const app = setupData.spotifyApp;
+  const fromCloudflare = app.source !== 'admin';
+  const showForm = !fromCloudflare && (!app.configured || spotifyAppEditing);
+  $('spotifyRedirectUri').textContent = app.redirectUri || '';
+  $('spotifyAppHint').classList.toggle('gone', app.configured);
+  $('spotifyAppDone').classList.toggle('gone', !app.configured);
+  $('spotifyAppDoneText').textContent = app.configured
+    ? t('setup.done', { id: String(app.clientId || '').slice(0, 8) + '…' })
+    : '';
+  $('spotifyAppChangeBtn').classList.toggle('gone', fromCloudflare || spotifyAppEditing);
+  $('spotifyAppCloudflare').classList.toggle('gone', !fromCloudflare);
+  $('spotifyAppSteps').classList.toggle('gone', !showForm);
+  $('spotifyAppCancelBtn').classList.toggle('gone', !(app.configured && spotifyAppEditing));
+  const link = $('reauthLink');
+  link.setAttribute('aria-disabled', String(!app.configured));
+  link.classList.toggle('off', !app.configured);
+  link.title = app.configured ? '' : t('setup.needApp');
+}
+
+function spotifyAppInput(name) {
+  return $('spotifyAppForm').elements.namedItem(name);
+}
+
+async function saveSpotifyApp(event) {
+  event.preventDefault();
+  const button = $('spotifyAppSaveBtn');
+  button.disabled = true;
+  setStatus('spotifyAppStatus', () => t('setup.checking'));
+  try {
+    const result = await api('/admin/api/spotify-app', {
+      clientId: spotifyAppInput('clientId').value,
+      clientSecret: spotifyAppInput('clientSecret').value
+    });
+    spotifyAppInput('clientSecret').value = '';
+    spotifyAppEditing = false;
+    setupData = result.setup;
+    setStatus('spotifyAppStatus', '');
+    renderSetup();
+    if (statusData) renderStatus(statusData);
+    const key = result.changedApp ? 'setup.savedChanged' : 'setup.saved';
+    showResult('action', result.changedApp ? 'warn' : 'ok', () => t(key));
+    showToast(t(key));
+    $('reauthLink').focus();
+  } catch (error) {
+    setStatus('spotifyAppStatus', () => errorText(error), 'bad');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$('spotifyAppForm').addEventListener('submit', saveSpotifyApp);
+// Keep these inputs out of the widget form's preview and unsaved-changes logic.
+for (const type of ['input', 'change']) {
+  $('spotifyAppPanel').addEventListener(type, (event) => event.stopPropagation());
+}
+$('spotifyAppChangeBtn').addEventListener('click', () => {
+  spotifyAppEditing = true;
+  renderSetup();
+  spotifyAppInput('clientId').value = setupData?.spotifyApp?.clientId || '';
+  spotifyAppInput('clientId').focus();
+});
+$('spotifyAppCancelBtn').addEventListener('click', () => {
+  spotifyAppEditing = false;
+  spotifyAppInput('clientSecret').value = '';
+  setStatus('spotifyAppStatus', '');
+  renderSetup();
+});
+$('spotifyRedirectCopyBtn').addEventListener('click', () => {
+  const uri = $('spotifyRedirectUri').textContent;
+  navigator.clipboard.writeText(uri).then(() => showToast(t('setup.copied')), () => {
+    getSelection().selectAllChildren($('spotifyRedirectUri'));
+  });
+});
+$('reauthLink').addEventListener('click', (event) => {
+  if (setupData && !spotifyAppReady()) {
+    event.preventDefault();
+    setStatus('spotifyAppStatus', () => t('setup.needApp'), 'warn');
+    spotifyAppInput('clientId').focus();
+  }
+});
 
 function renderRecapSchedule() {
   if (!recapSchedule) return;
@@ -1258,6 +1355,8 @@ async function loadState() {
   albumImageUrl = data.albumImageUrl ?? null;
   discordClientId = data.discordClientId || null;
   recapSchedule = data.recapSchedule || null;
+  setupData = data.setup || null;
+  renderSetup();
   renderStatus(data.status);
   renderRecapSchedule();
   // Show the Discord field names from config next to the text inputs.
@@ -1283,7 +1382,7 @@ function renderChipTarget() {
 
 document.addEventListener('focusin', (event) => {
   const el = event.target;
-  if (el.tagName === 'INPUT' && el.type === 'text' && form.contains(el)) {
+  if (el.tagName === 'INPUT' && el.type === 'text' && el.form === form) {
     lastTextInput = el;
     renderChipTarget();
   }
@@ -1312,6 +1411,7 @@ function relocalize() {
   renderChipTarget();
   if (lastPayload && fieldMap) renderPreview(lastPayload, fieldMap);
   renderHero();
+  renderSetup();
   if (statusData) renderStatus(statusData);
   renderRecapSchedule();
   for (const id of statusLines.keys()) renderStatusLine(id);
@@ -1419,6 +1519,8 @@ renderResult('action');
 renderChipTarget();
 loadState()
   .then((data) => {
+    // First visit after deploying: the Spotify app is the next step.
+    if (!location.hash && data.setup && !data.setup.spotifyApp.configured) showTab('status');
     fillForm(data.settings);
     renderPreview(data.payload, data.fields);
     markSaved();
