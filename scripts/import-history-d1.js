@@ -175,7 +175,7 @@ function findJsonFiles(target) {
 
 function parseArgs(args) {
   const parsed = {
-    dbName: 'spotify-discord-stats',
+    dbName: 'DB',
     remote: false,
     dryRun: false,
     batchSize: DEFAULT_BATCH_SIZE,
@@ -253,7 +253,7 @@ function sqlNumber(value) {
 
 function usage() {
   console.error(`Usage:
-  npm run cf:import -- [--local|--remote] [--db spotify-discord-stats] [--dry-run]
+  npm run cf:import -- [--local|--remote] [--db DB] [--dry-run]
     [--after ISO_DATE] [--before ISO_DATE | --no-cutoff] /path/to/export
 
 By default only plays before the first play synced from Spotify are imported,

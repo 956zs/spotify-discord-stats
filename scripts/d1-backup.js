@@ -3,7 +3,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { runWrangler } from './wrangler.js';
 
-const DEFAULT_DB_NAME = 'spotify-discord-stats';
+// The binding name, so it works whatever the database is called (the Deploy button may rename it).
+const DEFAULT_DB_NAME = 'DB';
 const DEFAULT_OUTPUT_DIR = 'backups/d1';
 
 const options = parseArgs(process.argv.slice(2));
@@ -34,7 +35,8 @@ function runWranglerExport(outputPath) {
 function defaultOutputPath(options) {
   const mode = options.remote ? 'remote' : 'local';
   const timestamp = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
-  return path.join(DEFAULT_OUTPUT_DIR, `${options.dbName}-${mode}-${timestamp}.sql`);
+  const label = options.dbName === DEFAULT_DB_NAME ? 'spotify-discord-stats' : options.dbName;
+  return path.join(DEFAULT_OUTPUT_DIR, `${label}-${mode}-${timestamp}.sql`);
 }
 
 function parseArgs(args) {

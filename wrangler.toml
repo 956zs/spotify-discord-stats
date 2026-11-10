@@ -1,0 +1,39 @@
+# Shipped config: works as is with the Deploy to Cloudflare button and `npm run deploy`.
+# No IDs needed: the first deploy creates the D1 database. For a personal setup
+# (account_id, your own domain, fixed IDs), copy this file to wrangler.local.toml
+# (gitignored); the npm scripts use it instead when it exists.
+
+name = "spotify-discord-stats"
+main = "worker/index.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+# Optional: only needed if your Cloudflare login can see more than one account.
+# account_id = "your-cloudflare-account-id"
+
+# Optional: serve the Worker on your own domain instead of *.workers.dev.
+# The domain must already be on Cloudflare.
+# routes = [
+#   { pattern = "stats.example.com", custom_domain = true }
+# ]
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[observability]
+enabled = false
+
+[observability.logs]
+enabled = false
+invocation_logs = false
+
+# Everything else is found or entered at runtime: the Discord app and your user ID
+# come from the bot token, the Spotify app is entered on the admin page, and the
+# public URL is the one you open the admin page on. To pin a value, set it here:
+# [vars]
+# PUBLIC_BASE_URL = "https://stats.example.com"
+# DISCORD_REMINDER_USER_ID = "send DMs to this user instead of the app owner"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "spotify-discord-stats"
