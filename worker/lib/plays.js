@@ -1,26 +1,37 @@
 import { spotifyItemToPlayRecords } from '../../shared/play-records.js';
 import { nowIso } from '../../shared/time.js';
+import { invalidateStatWindows } from './stat-windows.js';
 
+// Columns the widget stats count. If an upsert changes one of them on a play that is
+// already stored, the incrementally maintained stat windows have to be rebuilt.
+const COUNTED_COLUMNS = ['track_name', 'album_key', 'album_name', 'duration_ms', 'ms_played'];
+
+// One D1 call per play: the existing row, the play upsert, and its artists run as one
+// batch (a transaction), which keeps a sync of many plays under the Workers Free limit
+// of 50 D1 calls per invocation and never leaves a play without its artists.
 export async function upsertSpotifyPlay(db, item) {
   const records = spotifyItemToPlayRecords(item);
   if (!records) {
     return false;
   }
 
-  const inserted = await upsertPlay(db, records.play);
-  for (const artist of records.artists) {
-    await upsertPlayArtist(db, artist);
+  const [existingResult, storedResult] = await db.batch([
+    db.prepare(`SELECT ${COUNTED_COLUMNS.join(', ')} FROM plays WHERE played_at = ? AND track_key = ?`)
+      .bind(records.play.playedAt, records.play.trackKey),
+    upsertPlayStatement(db, records.play),
+    ...records.artists.flatMap((artist) => upsertPlayArtistStatements(db, artist))
+  ]);
+
+  const existing = existingResult.results?.[0] ?? null;
+  const stored = storedResult.results?.[0] ?? null;
+  if (existing && COUNTED_COLUMNS.some((column) => existing[column] !== stored?.[column])) {
+    await invalidateStatWindows(db);
   }
-  return inserted;
+  return !existing;
 }
 
-async function upsertPlay(db, play) {
-  const existing = await db
-    .prepare('SELECT 1 FROM plays WHERE played_at = ? AND track_key = ?')
-    .bind(play.playedAt, play.trackKey)
-    .first();
-
-  await db
+function upsertPlayStatement(db, play) {
+  return db
     .prepare(`
       INSERT INTO plays (
         played_at, played_at_ms, track_key, track_id, track_uri, track_name,
@@ -39,35 +50,36 @@ async function upsertPlay(db, play) {
         album_image_url = COALESCE(plays.album_image_url, excluded.album_image_url),
         duration_ms = COALESCE(plays.duration_ms, excluded.duration_ms),
         ms_played = COALESCE(excluded.ms_played, plays.ms_played)
+      RETURNING ${COUNTED_COLUMNS.join(', ')}
     `)
-    .bind(...playBindings(play), nowIso())
-    .run();
-
-  return !existing;
+    .bind(...playBindings(play), nowIso());
 }
 
-async function upsertPlayArtist(db, artist) {
-  await db
-    .prepare(`
-      INSERT OR IGNORE INTO play_artists (
-        played_at, track_key, artist_key, artist_id, artist_uri, artist_name
-      )
-      VALUES (?, ?, ?, ?, ?, ?)
-    `)
-    .bind(...artistBindings(artist))
-    .run();
-
-  await db
-    .prepare(`
-      INSERT INTO artists (artist_key, artist_id, artist_uri, artist_name)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(artist_key) DO UPDATE SET
-        artist_id = COALESCE(excluded.artist_id, artists.artist_id),
-        artist_uri = COALESCE(excluded.artist_uri, artists.artist_uri),
-        artist_name = excluded.artist_name
-    `)
-    .bind(artist.artistKey, artist.artistId, artist.artistUri, artist.artistName)
-    .run();
+// The artists upsert skips the write when nothing changes (D1 bills every updated row).
+function upsertPlayArtistStatements(db, artist) {
+  return [
+    db
+      .prepare(`
+        INSERT OR IGNORE INTO play_artists (
+          played_at, track_key, artist_key, artist_id, artist_uri, artist_name
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+      `)
+      .bind(...artistBindings(artist)),
+    db
+      .prepare(`
+        INSERT INTO artists (artist_key, artist_id, artist_uri, artist_name)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(artist_key) DO UPDATE SET
+          artist_id = COALESCE(excluded.artist_id, artists.artist_id),
+          artist_uri = COALESCE(excluded.artist_uri, artists.artist_uri),
+          artist_name = excluded.artist_name
+        WHERE artists.artist_id IS NOT COALESCE(excluded.artist_id, artists.artist_id)
+          OR artists.artist_uri IS NOT COALESCE(excluded.artist_uri, artists.artist_uri)
+          OR artists.artist_name IS NOT excluded.artist_name
+      `)
+      .bind(artist.artistKey, artist.artistId, artist.artistUri, artist.artistName)
+  ];
 }
 
 function playBindings(play) {

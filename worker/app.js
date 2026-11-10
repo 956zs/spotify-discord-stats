@@ -189,7 +189,7 @@ async function handleAdminApi(request, url, env) {
 
   if (url.pathname === '/admin/api/preview') {
     const settings = parseSettingsInput(body.settings);
-    const data = await getWidgetData(env.DB, settings, { publicBaseUrl: publicBaseUrl(env) });
+    const data = await getWidgetData(env.DB, settings, { publicBaseUrl: publicBaseUrl(env), saved: false });
     return json({
       payload: buildWidgetPayload(data, settings),
       fields: widgetConfig.fields,

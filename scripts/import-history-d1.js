@@ -9,6 +9,10 @@ import { exportRowToPlayRecords } from '../shared/play-records.js';
 const CHUNK_INDEX_PAD_WIDTH = 4;
 const DEFAULT_BATCH_SIZE = 200;
 const STATEMENTS_PER_EXPORT_ROW = 3;
+const STAT_WINDOW_RESET_SQL = [
+  'DELETE FROM stat_windows;',
+  "DELETE FROM app_state WHERE key LIKE 'widget_metrics_cache:%';"
+];
 
 const options = parseArgs(process.argv.slice(2));
 if (options.targets.length === 0) {
@@ -62,9 +66,10 @@ for (const file of jsonFiles) {
   console.log(`Read ${file}: ${rows.length} rows`);
 }
 
-if (statements.length > 0) {
-  executeChunk();
-}
+// Imported rows can update plays the widget stat windows already counted, so make the
+// Worker rebuild them (and drop its cached results) on the next sync.
+statements.push(...STAT_WINDOW_RESET_SQL);
+executeChunk();
 
 console.log(`Done. Seen ${seen}, skipped ${skipped}, chunks ${chunkIndex}.`);
 console.log(`SQL chunks kept in ${tempDir}`);

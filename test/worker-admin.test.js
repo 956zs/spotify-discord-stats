@@ -81,17 +81,18 @@ test('empty database still builds a payload', async () => {
   assert.equal(await slotValue(env.DB, settingsWith(28), 5), 'unknown');
 });
 
-test('cached range results are reused until a newer play arrives or refresh is forced', async () => {
+test('cached range results are reused until any play is added', async () => {
   const env = createEnv();
   const now = Date.now();
   insertPlay(env.DB, now - DAY_MS, 'a', 'a1');
   assert.equal(await slotValue(env.DB, settingsWith(28), 0), '1');
 
-  // A play older than the newest one (like an import) leaves the cache in place...
-  insertPlay(env.DB, now - 2 * DAY_MS, 'imported', 'a1');
+  // Nothing new: the cached result is served (even a refresh gives the same number).
   assert.equal(await slotValue(env.DB, settingsWith(28), 0), '1');
-  // ...until a refresh is forced.
-  assert.equal(await slotValue(env.DB, settingsWith(28), 0, { refresh: true }), '2');
+  assert.equal(await slotValue(env.DB, settingsWith(28), 0, { refresh: true }), '1');
+  // A play older than the newest one (a late offline play, an import) still counts.
+  insertPlay(env.DB, now - 2 * DAY_MS, 'imported', 'a1');
+  assert.equal(await slotValue(env.DB, settingsWith(28), 0), '2');
 
   insertPlay(env.DB, now, 'b', 'a2');
   assert.equal(await slotValue(env.DB, settingsWith(28), 0), '3');

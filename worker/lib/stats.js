@@ -2,13 +2,12 @@ import { playRowToSongStatus } from '../../shared/song.js';
 import { nowIso, sinceIso } from '../../shared/time.js';
 import { collectWidgetData } from '../../shared/widget-payload.js';
 import {
-  getLatestPlayedAtMs,
   rangeKey,
-  resolveSince,
-  runMetricQueries
+  resolveSince
 } from '../../shared/widget-metrics-query.js';
 import { HERO_UPLOAD } from '../../shared/widget-hero.js';
 import { isAllTime } from '../../shared/widget-settings.js';
+import { loadWindowResults, pruneStatWindows } from './stat-windows.js';
 import { getState, setState } from './state.js';
 import { HERO_IMAGE_KEY, getWidgetImageMeta } from './widget-images.js';
 
@@ -16,23 +15,29 @@ const CACHE_KEY_PREFIX = 'widget_metrics_cache:';
 
 // Widget numbers for the current settings. Each range's results are cached and reused
 // while the newest play, the hour-floored window start, and the query set are all
-// unchanged, so idle cron ticks skip the window scans entirely. `refresh` forces a
-// recompute, e.g. after importing older history (which leaves the newest play as is).
+// unchanged, so idle cron ticks skip the work entirely. On a cache miss the numbers
+// come from the range's incrementally maintained window (stat-windows.js), which only
+// reads the plays that changed since the last sync. `refresh` skips the cache.
+// `saved: false` marks unsaved settings (admin preview): ranges without a window then
+// run the direct queries instead of building one. Saved settings also drop windows of
+// ranges they no longer use.
 // `publicBaseUrl` is where /widget/hero is reachable; without it "upload" acts like "asset".
 export async function getWidgetData(db, settings, options = {}) {
+  const saved = options.saved ?? true;
   const now = options.now ?? new Date();
-  const latestPlayedAtMs = await getLatestPlayedAtMs(db);
+  const playsVersion = await getPlaysVersion(db);
+  let computed = false;
   const heroUpload =
     settings.widget.heroImage === HERO_UPLOAD ? await getWidgetImageMeta(db, HERO_IMAGE_KEY) : null;
 
-  return collectWidgetData(db, settings, {
+  const data = await collectWidgetData(db, settings, {
     now,
     lastPlayed: await getLastPlayedSong(db),
     heroUpload,
     publicBaseUrl: options.publicBaseUrl,
     loadRange: async (days, queryIds) => {
       const since = await resolveSince(db, days, now);
-      const fingerprint = `${latestPlayedAtMs}|${since}|${queryIds.join(',')}`;
+      const fingerprint = `${playsVersion}|${since}|${queryIds.join(',')}`;
       const cacheKey = `${CACHE_KEY_PREFIX}${rangeKey(days)}`;
 
       if (!options.refresh) {
@@ -42,11 +47,27 @@ export async function getWidgetData(db, settings, options = {}) {
         }
       }
 
-      const results = await runMetricQueries(db, since, queryIds);
+      computed = true;
+      const results = await loadWindowResults(db, rangeKey(days), since, queryIds, { allowBuild: saved });
       await setState(db, cacheKey, JSON.stringify({ fingerprint, results }));
       return { since, results };
     }
   });
+  if (saved && computed) {
+    await pruneStatWindows(db, Object.keys(data.ranges));
+  }
+  return data;
+}
+
+// Changes whenever a play or play artist row is added, including late plays with an
+// older played_at. Rewrites of existing rows clear the cache instead (see
+// invalidateStatWindows).
+async function getPlaysVersion(db) {
+  const row = await db.prepare(`
+    SELECT (SELECT COALESCE(MAX(rowid), 0) FROM plays) || ':' ||
+      (SELECT COALESCE(MAX(rowid), 0) FROM play_artists) AS version
+  `).first();
+  return row?.version ?? '0:0';
 }
 
 async function readCache(db, key) {

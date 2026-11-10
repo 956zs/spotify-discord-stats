@@ -206,11 +206,6 @@ export async function getEarliestPlayedAt(db) {
   return row?.played_at ?? null;
 }
 
-export async function getLatestPlayedAtMs(db) {
-  const row = await first(db, 'SELECT MAX(played_at_ms) AS played_at_ms FROM plays', []);
-  return row?.played_at_ms ?? null;
-}
-
 function numeric(value) {
   return Number(value ?? 0);
 }
