@@ -5,6 +5,11 @@ This project has two separate things to protect:
 - Worker code, which can be rolled back with Wrangler deployments.
 - D1 data, which should be protected before imports or schema changes.
 
+Run the commands below in the project folder after `npm install` and
+`npx wrangler login`. `npm run cf -- <wrangler args>` runs Wrangler with
+`wrangler.local.toml` when it exists, and `DB` is the database's binding name,
+so the commands work whatever the database is called.
+
 Spotify export imports are append/upsert operations. They are safe to run more
 than once because plays are keyed by `played_at + track_key`, but a bad import
 can still add unwanted rows. Capture a rollback point before importing.
@@ -14,13 +19,13 @@ can still add unwanted rows. Capture a rollback point before importing.
 List deployed Worker versions:
 
 ```bash
-npx wrangler versions list --name spotify-discord-stats
+npm run cf -- versions list
 ```
 
 Roll back to a known good version:
 
 ```bash
-npx wrangler rollback --name spotify-discord-stats VERSION_ID
+npm run cf -- rollback VERSION_ID
 ```
 
 This only changes the Worker code. It does not roll back D1 rows.
@@ -40,17 +45,18 @@ date -u +"%Y-%m-%dT%H:%M:%SZ"
 Check the matching Time Travel bookmark:
 
 ```bash
-npx wrangler d1 time-travel info spotify-discord-stats --timestamp="2026-07-09T05:00:00Z"
+npm run cf -- d1 time-travel info DB --timestamp="2026-07-09T05:00:00Z"
 ```
 
 Restore the whole database to that point:
 
 ```bash
-npx wrangler d1 time-travel restore spotify-discord-stats --timestamp="2026-07-09T05:00:00Z"
+npm run cf -- d1 time-travel restore DB --timestamp="2026-07-09T05:00:00Z"
 ```
 
 This is destructive: it overwrites the whole database, including OAuth state,
-stored Spotify refresh token, Discord widget state, plays, artists, and import
+stored Spotify refresh token, the Spotify app saved on the admin page,
+Discord widget state, plays, artists, and import
 data.
 
 ## SQL Backup
@@ -62,7 +68,9 @@ npm run cf:d1:backup:remote
 ```
 
 Backups are written to `backups/d1/`, which is gitignored. Treat those files as
-secret data because a full D1 export includes `app_state` values.
+secret data because a full D1 export includes `app_state` values: the Spotify
+refresh token and, when the Spotify app was entered on the admin page, the
+Spotify Client Secret.
 
 For a local D1 backup:
 
@@ -187,19 +195,19 @@ if you may want to remove only that import later.
 Verify row counts:
 
 ```bash
-npx wrangler d1 execute spotify-discord-stats --remote --command "SELECT source, COUNT(*) AS plays FROM plays GROUP BY source;"
+npm run cf -- d1 execute DB --remote --command "SELECT source, COUNT(*) AS plays FROM plays GROUP BY source;"
 ```
 
 Check latest rows:
 
 ```bash
-npx wrangler d1 execute spotify-discord-stats --remote --command "SELECT played_at, track_name, album_name, source FROM plays ORDER BY played_at_ms DESC LIMIT 10;"
+npm run cf -- d1 execute DB --remote --command "SELECT played_at, track_name, album_name, source FROM plays ORDER BY played_at_ms DESC LIMIT 10;"
 ```
 
 Show the first and last API-synced rows (the default cutoff is the first):
 
 ```bash
-npx wrangler d1 execute spotify-discord-stats --remote --command "SELECT MIN(played_at) AS first_api, MAX(played_at) AS last_api, COUNT(*) AS api_rows FROM plays WHERE source = 'spotify_api';"
+npm run cf -- d1 execute DB --remote --command "SELECT MIN(played_at) AS first_api, MAX(played_at) AS last_api, COUNT(*) AS api_rows FROM plays WHERE source = 'spotify_api';"
 ```
 
 ## Roll Back Only One Export Import
@@ -244,7 +252,7 @@ COMMIT;
 Run it through Wrangler:
 
 ```bash
-npx wrangler d1 execute spotify-discord-stats --remote --file rollback-import.sql
+npm run cf -- d1 execute DB --remote --file rollback-import.sql
 ```
 
 This targeted rollback only removes rows that were newly inserted by that import

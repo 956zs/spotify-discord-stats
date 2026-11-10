@@ -17,8 +17,12 @@ switch, and Log out. Below it, four tabs:
   still open (upload or album mode, not ticked yet).
 - **Recaps** (週報月報): the recap DM switch, when recaps are sent, and test
   sends.
-- **Status** (狀態): authorization dates, last push, Sync now, Reconnect
-  Spotify, and the result and raw response of the last action.
+- **Status** (狀態): the Spotify app panel, authorization dates, last push,
+  the Discord app, Sync now, Reconnect Spotify, and the result and raw
+  response of the last action.
+
+While the Spotify app is not set up, the page opens on the Status tab (unless
+the URL already names a tab).
 
 The active tab is kept in the URL hash (`/admin#hero`), so a reload stays on
 it. The tabs work with the arrow keys, Home and End.
@@ -43,6 +47,40 @@ default slot labels and recap DMs stay as configured, since Discord shows them.
 Error messages come with a `code` from the server so the page can show them in
 either language.
 
+## Spotify app panel
+
+The **Spotify app** panel (Spotify app) at the top of the Status tab is where
+the Spotify app is entered after deploying:
+
+- It shows the exact **Redirect URI** to add in the Spotify Developer
+  Dashboard, with a **Copy** (複製) button, and the three steps to create the
+  app. The Redirect URI is the address the page is open on plus
+  `/spotify/callback` (or `SPOTIFY_REDIRECT_URI` / `PUBLIC_BASE_URL` when set
+  in Cloudflare).
+- Paste the **Client ID** and **Client Secret** and click **Save and check**
+  (儲存並檢查). The Worker first checks the pair with Spotify (client
+  credentials grant), then saves both to D1. Each must be 32 letters and
+  digits; a pair Spotify rejects is not saved.
+- After saving, click **Reconnect Spotify** (Spotify 重新授權) to connect your
+  account. Until the app is saved, Reconnect Spotify is greyed out, and
+  `/spotify/login` redirects back to the Status tab.
+- Once saved, the panel shows **Set up (Client ID …)** with the first
+  characters of the Client ID and a **Change** (更換) button that opens the form
+  again. The Client Secret is never sent back to the page. Saving a different
+  Client ID makes the old Spotify authorization unusable, so the page asks you
+  to reconnect.
+- When `SPOTIFY_CLIENT_ID` or `SPOTIFY_CLIENT_SECRET` is set in Cloudflare,
+  the panel says the app is set in Cloudflare and has no form; change it there.
+
+## Discord app row
+
+The status list has a **Discord app** row: the application ID and the user the
+DMs and widget go to (`DISCORD_CLIENT_ID` and `DISCORD_USER_ID`, read from the
+bot token unless set in Cloudflare; see
+[cloudflare-worker.md](cloudflare-worker.md#what-the-worker-fills-in-by-itself)).
+If the app cannot be read from the bot token, the row says
+**Could not read the app from the bot token; check DISCORD_TOKEN**.
+
 ## What you can change
 
 - Global stats range: 7 / 28 / 90 / 365 days, a custom number of days, or all
@@ -55,8 +93,9 @@ either language.
   - Custom upload (自訂上傳): upload a PNG, JPEG, WebP or GIF (max 1.5 MB,
     1300×1200 fits the template) on the page. The widget points at
     `PUBLIC_BASE_URL/widget/hero?v=<hash>`, so a new upload changes the URL and
-    skips Discord's cache. With no image uploaded, or no `PUBLIC_BASE_URL` /
-    `SPOTIFY_REDIRECT_URI` to build a public URL, it falls back to the asset.
+    skips Discord's cache. With no image uploaded, or no public URL yet (set
+    `PUBLIC_BASE_URL`, or open the admin page once over `https`), it falls back
+    to the asset.
     Choose & crop an image (選擇圖片並裁切) opens a crop tool in the browser: drag to
     move, slider or mouse wheel to zoom, with guides for the template's
     boundaries area (top 4%), heavy/minor fade zones (left 0–17% / 17–35%)
@@ -154,10 +193,11 @@ The page itself uses these JSON routes (signed-in session, same-origin only):
 
 ```text
 GET  /admin/api/state              settings, defaults, preview payload, metric catalog (zh-TW + English names),
-                                   hero image info, album cover URL, discordClientId, recap schedule, status
+                                   hero image info, album cover URL, discordClientId, recap schedule, status, setup
 POST /admin/api/preview            preview payload (and album cover URL) for unsaved settings
 POST /admin/api/settings           save settings
 POST /admin/api/push               sync and push to Discord now
+POST /admin/api/spotify-app        check and save the Spotify app ({ clientId, clientSecret }), returns { changedApp, setup }
 POST /admin/api/hero-image         upload the hero image (raw body, Content-Type image/png|jpeg|webp|gif, max 1.5 MB)
 POST /admin/api/hero-image/delete  delete the uploaded hero image
 ```
@@ -174,10 +214,24 @@ WebP and GIF files are stored.
 }
 ```
 
+`setup` describes the runtime settings, never the Client Secret itself:
+
+```json
+{
+  "spotifyApp": { "clientId": "…", "hasSecret": true, "configured": true, "source": "admin", "redirectUri": "https://…/spotify/callback" },
+  "discordApp": { "applicationId": "…", "userId": "…" },
+  "publicBaseUrl": "https://…"
+}
+```
+
+`source` is `admin` (saved from this page), `cloudflare` (both values set in
+Cloudflare) or `mixed` (only one of them set in Cloudflare).
+
 Errors are JSON `{ "error": "<message>", "code": "<code>", "details": [...] }`.
 `error` keeps the readable message (upload errors in Traditional Chinese, the
 rest in English); `code` is stable (`unauthorized`, `forbidden`,
 `invalid_settings`, `image_too_large`, `image_type`, `spotify_not_connected`,
+`invalid_spotify_app`, `spotify_app_rejected`, `spotify_app_from_cloudflare`,
 … see `ERROR_CODES` in [worker/lib/http.js](../worker/lib/http.js)); `details`
 lists the individual problems for `invalid_settings` and the missing setting
 for `missing_config`.

@@ -34,7 +34,7 @@ Clone the repo on the VPS:
 git clone https://github.com/YOUR_NAME/spotify-discord-stats.git
 cd spotify-discord-stats
 npm install
-cp .env.example .env
+cp node.env.example .env
 ```
 
 Fill `.env`:
@@ -58,6 +58,12 @@ DATABASE_PATH=./data/spotify.sqlite
 ```
 
 Keep `.env` private. It contains secrets.
+
+Unlike the Worker, the Node runtime does not read the Discord app or user ID
+from the bot token, has no admin page for the Spotify app, and does not
+remember a public URL, so fill in `DISCORD_CLIENT_ID`, `DISCORD_USER_ID`,
+`SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REDIRECT_URI`, and
+`PUBLIC_BASE_URL` yourself.
 
 ## Spotify Redirect URI
 

@@ -20,7 +20,7 @@ widget editor and filled with data by the Worker.
 
 ## Setting it up
 
-The short version is [Step 7 of the README](../README.md#step-7-set-up-the-profile-widget):
+The short version is [Step 6 of the README](../README.md#step-6-set-up-the-profile-widget):
 paste [discord-widget-config.json](discord-widget-config.json) into the editor
 with **⋮** → **Paste config from clipboard**, upload the three images, save and
 publish, then apply the application identity and add the widget to your
@@ -93,6 +93,10 @@ Every sync builds a payload and sends it with the bot token to:
 PATCH https://discord.com/api/v9/applications/{DISCORD_CLIENT_ID}/users/{DISCORD_USER_ID}/identities/{DISCORD_IDENTITY_ID}/profile
 ```
 
+`DISCORD_CLIENT_ID` and `DISCORD_USER_ID` are the bot token's application and
+its owner unless you set them in Cloudflare (see
+[cloudflare-worker.md](cloudflare-worker.md#what-the-worker-fills-in-by-itself)),
+so the widget must belong to the same app as the bot.
 `DISCORD_IDENTITY_ID` defaults to `0`. The payload is only sent when it changed
 since the last sync. If the request fails, the sync still saves your plays and
 the recap DMs still go out; the admin page shows the error as a warning.
