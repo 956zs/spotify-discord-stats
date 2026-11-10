@@ -1,7 +1,7 @@
 import { appConfig } from '../config.js';
 import { MS_PER_DAY } from '../../shared/time.js';
 import { trySendDiscordDm } from './discord.js';
-import { publicBaseUrl, requiredEnv } from './env.js';
+import { publicBaseUrl } from './env.js';
 import { getSpotifyRefreshTokenIssuedAt } from './spotify.js';
 import { getState, setState } from './state.js';
 
@@ -63,9 +63,14 @@ function reauthorizeText(env) {
   return `Authorize here: ${getSpotifyLoginUrl(env, baseUrl)}`;
 }
 
+// With ADMIN_TOKEN the link signs in by itself; without it, the admin page asks
+// for a sign-in link first and opens on the Status tab.
 function getSpotifyLoginUrl(env, baseUrl) {
+  if (!env.ADMIN_TOKEN) {
+    return new URL('/admin#status', baseUrl).toString();
+  }
   const url = new URL('/spotify/login', baseUrl);
-  url.searchParams.set('token', requiredEnv(env, 'ADMIN_TOKEN'));
+  url.searchParams.set('token', env.ADMIN_TOKEN);
   return url.toString();
 }
 

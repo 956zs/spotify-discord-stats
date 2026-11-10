@@ -427,7 +427,7 @@ test('admin and login pages render in the browser language under a strict CSP', 
     env
   );
   assert.equal(failed.status, 401);
-  assert.match(await failed.text(), /data-i18n="login\.failed">Wrong token</);
+  assert.match(await failed.text(), /data-i18n="login\.notice\.failed">Wrong token</);
 
   const cookie = await login(env);
   const page = await handleRequest(request('/admin', { headers: { Cookie: cookie, 'Accept-Language': 'zh-HK' } }), env);

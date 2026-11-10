@@ -19,20 +19,62 @@ function tx(t, key, tag = 'span', attrs = '') {
   return `<${tag} data-i18n="${key}"${attrs ? ` ${attrs}` : ''}>${t(key)}</${tag}>`;
 }
 
-export function loginMarkup(t, failed) {
-  const error = failed
-    ? `<p class="tone bad" role="alert">${icon('xcircle')}${tx(t, 'login.failed')}</p>`
+const LOGIN_NOTICES = {
+  failed: ['bad', 'xcircle'],
+  sent: ['ok', 'okcircle'],
+  tooSoon: ['warn', 'alert'],
+  dmFailed: ['bad', 'xcircle'],
+  expired: ['warn', 'alert'],
+  noApp: ['bad', 'xcircle']
+};
+const LOGIN_TOKEN_PATTERN = /^[0-9a-f]{64}$/;
+
+// Sign-in page. Without ADMIN_TOKEN the only way in is a one-time link the bot
+// DMs you; `confirmToken` renders the page that link opens (a POST button, so
+// link previews cannot use up the link).
+export function loginMarkup(t, options = {}) {
+  const { notice = null, passwordLogin = false, installUrl = null, confirmToken = null } = options;
+  const tone = LOGIN_NOTICES[notice];
+  const noticeLine = tone
+    ? `<p class="tone ${tone[0]}" role="${tone[0] === 'ok' ? 'status' : 'alert'}">${icon(tone[1])}${tx(t, `login.notice.${notice}`)}</p>`
     : '';
+  let content;
+  if (confirmToken && LOGIN_TOKEN_PATTERN.test(confirmToken)) {
+    content = `${tx(t, 'login.confirmHint', 'p', 'class="hint"')}
+    <form method="post" action="/admin/login/confirm">
+      <input type="hidden" name="t" value="${confirmToken}">
+      <button type="submit" class="btn primary lg wide" autofocus>${tx(t, 'login.confirm')}</button>
+    </form>`;
+  } else {
+    const install = installUrl
+      ? `<li>${tx(t, 'login.step1')}<a class="btn sm" href="${installUrl}" target="_blank" rel="noopener noreferrer">${icon('external')}${tx(t, 'login.install')}</a></li>`
+      : '';
+    const password = passwordLogin
+      ? `<div class="or">${tx(t, 'login.or')}</div>
+    <form method="post" action="/admin/login">
+      <label class="field"><span class="lab">ADMIN_TOKEN</span><input class="inp" type="password" name="token" autocomplete="current-password" required></label>
+      <button type="submit" class="btn lg wide">${tx(t, 'login.submit')}</button>
+    </form>`
+      : '';
+    content = `${tx(t, 'login.hint', 'p', 'class="hint"')}
+    ${noticeLine}
+    <ol class="steps login-steps">
+      ${install}
+      <li>${tx(t, 'login.step2')}<form method="post" action="/admin/login/link"><button type="submit" class="btn primary wide">${icon('send')}${tx(t, 'login.sendLink')}</button></form></li>
+    </ol>
+    ${tx(t, 'login.dmNote', 'p', 'class="hint"')}
+    ${password}`;
+    return loginShell(t, content);
+  }
+  return loginShell(t, `${noticeLine}${content}`);
+}
+
+function loginShell(t, content) {
   return `${iconSprite()}
 <main class="login">
   <div class="login-card">
     <div class="login-top"><span class="logo">${icon('music')}</span><h1>Spotify Stats <span class="faint">Admin</span></h1>${langSwitch(t)}</div>
-    ${tx(t, 'login.hint', 'p', 'class="hint"')}
-    ${error}
-    <form method="post" action="/admin/login">
-      <label class="field"><span class="lab">ADMIN_TOKEN</span><input class="inp" type="password" name="token" autocomplete="current-password" required autofocus></label>
-      <button type="submit" class="btn primary lg wide">${tx(t, 'login.submit')}</button>
-    </form>
+    ${content}
   </div>
 </main>`;
 }

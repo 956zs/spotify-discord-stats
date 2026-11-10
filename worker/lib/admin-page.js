@@ -31,12 +31,13 @@ export function adminPageResponse(lang = DEFAULT_LANGUAGE) {
   });
 }
 
-export function loginPageResponse(status = 200, failed = false, lang = DEFAULT_LANGUAGE) {
+// options: { notice, passwordLogin, installUrl, confirmToken } (see loginMarkup).
+export function loginPageResponse(status = 200, options = {}, lang = DEFAULT_LANGUAGE) {
   const language = isLanguage(lang) ? lang : DEFAULT_LANGUAGE;
   return page({
     lang: language,
     style: LOGIN_STYLE,
-    body: loginMarkup(translator(language), failed),
+    body: loginMarkup(translator(language), options),
     script: bootScript({ messages: pickMessages(LOGIN_KEYS) }) + I18N_RUNTIME,
     status
   });

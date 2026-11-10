@@ -1,23 +1,29 @@
-import { requiredEnv } from './env.js';
+import { cryptoRandomHex } from './crypto.js';
 import { ERROR_CODES, HttpError } from './http.js';
 
-// The admin page signs in once with ADMIN_TOKEN and then carries a signed session
-// cookie, so the token stops appearing in URLs and browser history. Rotating
-// ADMIN_TOKEN invalidates every session because it is also the signing key.
+// The admin page signs in once (with ADMIN_TOKEN, or with a one-time link the bot
+// DMs you, see login-link.js) and then carries a signed session cookie, so no token
+// appears in URLs or browser history. The signing key is ADMIN_TOKEN when it is set
+// (rotating it invalidates every session); without it, a random key kept in D1.
 const SESSION_COOKIE = 'admin_session';
+const SESSION_KEY_STATE = 'admin_session_key';
+const SESSION_KEY_BYTES = 32;
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const MS_PER_SECOND = 1000;
 
 export async function isAdminRequest(request, url, env) {
-  const expected = requiredEnv(env, 'ADMIN_TOKEN');
   const queryToken =
     url.searchParams.get('token') ||
     url.searchParams.get('admin_token') ||
     url.searchParams.get('key');
   if (queryToken) {
-    return timingSafeEqual(queryToken, expected);
+    return Boolean(env.ADMIN_TOKEN) && timingSafeEqual(queryToken, env.ADMIN_TOKEN);
   }
-  return verifySession(readCookie(request, SESSION_COOKIE), expected);
+  const cookie = readCookie(request, SESSION_COOKIE);
+  if (!cookie) {
+    return false;
+  }
+  return verifySession(cookie, await sessionSecret(env));
 }
 
 export async function requireAdmin(request, url, env) {
@@ -26,14 +32,35 @@ export async function requireAdmin(request, url, env) {
   }
 }
 
+// Password sign-in only exists when ADMIN_TOKEN is set.
+export function hasPasswordLogin(env) {
+  return Boolean(env.ADMIN_TOKEN);
+}
+
 export function checkAdminToken(token, env) {
-  return typeof token === 'string' && timingSafeEqual(token, requiredEnv(env, 'ADMIN_TOKEN'));
+  return hasPasswordLogin(env) && typeof token === 'string' && timingSafeEqual(token, env.ADMIN_TOKEN);
 }
 
 export async function createSessionCookie(env, now = Date.now()) {
   const expiresAt = now + SESSION_TTL_SECONDS * MS_PER_SECOND;
-  const signature = await sign(requiredEnv(env, 'ADMIN_TOKEN'), String(expiresAt));
+  const signature = await sign(await sessionSecret(env), String(expiresAt));
   return cookie(`${expiresAt}.${signature}`, SESSION_TTL_SECONDS);
+}
+
+// Created once; INSERT .. DO NOTHING keeps the first key if two requests race.
+export async function sessionSecret(env) {
+  if (env.ADMIN_TOKEN) {
+    return env.ADMIN_TOKEN;
+  }
+  const read = () => env.DB.prepare('SELECT value FROM app_state WHERE key = ?').bind(SESSION_KEY_STATE).first();
+  const row = await read();
+  if (row?.value) {
+    return row.value;
+  }
+  await env.DB.prepare('INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING')
+    .bind(SESSION_KEY_STATE, cryptoRandomHex(SESSION_KEY_BYTES))
+    .run();
+  return (await read()).value;
 }
 
 export function clearSessionCookie() {
@@ -104,7 +131,7 @@ async function sign(secret, message) {
   return [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function timingSafeEqual(a, b) {
+export function timingSafeEqual(a, b) {
   const left = new TextEncoder().encode(String(a));
   const right = new TextEncoder().encode(String(b));
   let diff = left.length ^ right.length;

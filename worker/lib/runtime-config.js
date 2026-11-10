@@ -3,7 +3,7 @@ import { ERROR_CODES, HttpError } from './http.js';
 import { getState, setState } from './state.js';
 
 // Settings that used to be required [vars] in wrangler.toml are now filled in at
-// runtime, so a fresh deploy only needs DISCORD_TOKEN and ADMIN_TOKEN:
+// runtime, so a fresh deploy only needs DISCORD_TOKEN (ADMIN_TOKEN is optional, see login-link.js):
 // - DISCORD_CLIENT_ID / DISCORD_USER_ID: looked up from the bot token (the app and its owner).
 // - PUBLIC_BASE_URL: the origin the admin page was last opened on.
 // - SPOTIFY_REDIRECT_URI: PUBLIC_BASE_URL + /spotify/callback.

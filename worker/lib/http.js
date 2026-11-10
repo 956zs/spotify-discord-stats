@@ -20,7 +20,10 @@ export const ERROR_CODES = Object.freeze({
   discordDmFailed: 'discord_dm_failed',
   invalidSpotifyApp: 'invalid_spotify_app',
   spotifyAppRejected: 'spotify_app_rejected',
-  spotifyAppFromCloudflare: 'spotify_app_from_cloudflare'
+  spotifyAppFromCloudflare: 'spotify_app_from_cloudflare',
+  discordAppUnknown: 'discord_app_unknown',
+  loginLinkTooSoon: 'login_link_too_soon',
+  loginLinkDmFailed: 'login_link_dm_failed'
 });
 
 export class HttpError extends Error {

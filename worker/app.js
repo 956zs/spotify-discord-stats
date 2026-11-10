@@ -7,6 +7,7 @@ import {
   checkAdminToken,
   clearSessionCookie,
   createSessionCookie,
+  hasPasswordLogin,
   isAdminRequest,
   requireAdmin,
   requireSameOrigin,
@@ -24,6 +25,7 @@ import {
 } from './lib/runtime-config.js';
 import { HERO_TEMPLATE_PATH, heroTemplateResponse } from './lib/hero-template.js';
 import { ERROR_CODES, HttpError, json } from './lib/http.js';
+import { LOGIN_CONFIRM_PATH, LOGIN_LINK_PATH, consumeLoginLink, sendLoginLink, userInstallUrl } from './lib/login-link.js';
 import { startSpotifyLogin, handleSpotifyCallback } from './lib/oauth.js';
 import { runDueRecapReports, sendMonthlyRecap, sendWeeklyRecap } from './lib/recap-delivery.js';
 import { runSpotifyReauthReminder } from './lib/reminder.js';
@@ -78,7 +80,7 @@ export async function handleRequest(request, rawEnv) {
   if (url.pathname === '/admin' || url.pathname === '/admin/') {
     const lang = pickLanguage(request.headers.get('Accept-Language'));
     if (!(await isAdminRequest(request, url, rawEnv))) {
-      return loginPageResponse(200, false, lang);
+      return loginPage(request, url, rawEnv, 200);
     }
     await rememberPublicOrigin(rawEnv, url.origin);
     return adminPageResponse(lang);
@@ -86,6 +88,14 @@ export async function handleRequest(request, rawEnv) {
 
   if (url.pathname === '/admin/login') {
     return handleLogin(request, url, rawEnv);
+  }
+
+  if (url.pathname === LOGIN_LINK_PATH) {
+    return handleLoginLink(request, url, rawEnv);
+  }
+
+  if (url.pathname === LOGIN_CONFIRM_PATH) {
+    return handleLoginConfirm(request, url, rawEnv);
   }
 
   if (url.pathname === '/admin/logout') {
@@ -162,15 +172,63 @@ async function adminEnv(request, url, rawEnv) {
   return withRuntimeConfig(rawEnv, { requestOrigin: url.origin });
 }
 
+async function loginPage(request, url, rawEnv, status, extra = {}) {
+  const env = await withRuntimeConfig(rawEnv, { requestOrigin: url.origin });
+  return loginPageResponse(
+    status,
+    {
+      passwordLogin: hasPasswordLogin(rawEnv),
+      installUrl: userInstallUrl(env.DISCORD_CLIENT_ID),
+      notice: env.DISCORD_CLIENT_ID ? null : 'noApp',
+      ...extra
+    },
+    pickLanguage(request.headers.get('Accept-Language'))
+  );
+}
+
 async function handleLogin(request, url, env) {
   requirePost(request);
   requireSameOrigin(request, url);
 
   const form = await request.formData();
   if (!checkAdminToken(form.get('token'), env)) {
-    return loginPageResponse(401, true, pickLanguage(request.headers.get('Accept-Language')));
+    return loginPage(request, url, env, 401, { notice: 'failed' });
   }
   return redirect('/admin', await createSessionCookie(env));
+}
+
+// GET: the page the DM link opens, with a button (link previews only GET, so they
+// cannot use up the link). POST from the login page: send a new link.
+async function handleLoginLink(request, url, rawEnv) {
+  if (request.method === 'GET') {
+    const token = url.searchParams.get('t') || '';
+    return loginPage(request, url, rawEnv, 200, /^[0-9a-f]{64}$/.test(token) ? { confirmToken: token } : { notice: 'expired' });
+  }
+  requirePost(request);
+  requireSameOrigin(request, url);
+  const env = await withRuntimeConfig(rawEnv, { requestOrigin: url.origin });
+  try {
+    await sendLoginLink(env, url.origin);
+  } catch (error) {
+    const notice = {
+      [ERROR_CODES.loginLinkTooSoon]: 'tooSoon',
+      [ERROR_CODES.discordAppUnknown]: 'noApp'
+    }[error.code] ?? 'dmFailed';
+    console.warn('sign-in link not sent', error.message);
+    return loginPage(request, url, rawEnv, error.status ?? 500, { notice });
+  }
+  return loginPage(request, url, rawEnv, 200, { notice: 'sent' });
+}
+
+async function handleLoginConfirm(request, url, rawEnv) {
+  requirePost(request);
+  requireSameOrigin(request, url);
+  const form = await request.formData();
+  if (!(await consumeLoginLink(rawEnv, form.get('t')))) {
+    return loginPage(request, url, rawEnv, 400, { notice: 'expired' });
+  }
+  await rememberPublicOrigin(rawEnv, url.origin);
+  return redirect('/admin', await createSessionCookie(rawEnv));
 }
 
 async function handleAdminApi(request, url, env, rawEnv) {
@@ -242,7 +300,7 @@ async function handleAdminApi(request, url, env, rawEnv) {
 async function setupStatus(env, rawEnv) {
   return {
     spotifyApp: await spotifyAppStatus(rawEnv, env),
-    discordApp: discordAppStatus(env),
+    discordApp: { ...discordAppStatus(env), installUrl: userInstallUrl(env.DISCORD_CLIENT_ID) },
     publicBaseUrl: publicBaseUrl(env)
   };
 }

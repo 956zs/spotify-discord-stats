@@ -87,6 +87,11 @@ const LOGIN = `
 .login-top { display:flex; align-items:center; gap:12px; }
 .login-top .lang { margin-left:auto; }
 .login form { display:flex; flex-direction:column; gap:16px; }
+.login-steps { margin:0; padding-left:20px; color:var(--text2); font-size:13px; display:flex; flex-direction:column; gap:14px; }
+.login-steps li > .btn, .login-steps li > form { margin-top:8px; }
+.login-steps li > .btn { display:flex; width:max-content; }
+.login .or { display:flex; align-items:center; gap:12px; color:var(--faint); font-size:12px; }
+.login .or::before, .login .or::after { content:''; flex:1; border-top:1px solid var(--line); }
 `;
 
 const ADMIN = `

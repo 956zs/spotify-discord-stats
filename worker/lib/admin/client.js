@@ -1181,7 +1181,10 @@ function renderStatus(status) {
   }
   const discordApp = setupData?.discordApp;
   if (discordApp?.applicationId) {
-    row('status.discordApp', t('status.discordAppValue', { app: discordApp.applicationId, user: discordApp.userId || '—' }));
+    const install = discordApp.installUrl
+      ? [' ', element('a', { href: discordApp.installUrl, target: '_blank', rel: 'noopener noreferrer', textContent: t('status.discordInstall') })]
+      : [];
+    row('status.discordApp', t('status.discordAppValue', { app: discordApp.applicationId, user: discordApp.userId || '—' }), ...install);
   } else if (setupData) {
     row('status.discordApp', element('span', { className: 'note bad', textContent: t('status.discordAppMissing') }));
   }

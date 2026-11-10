@@ -227,7 +227,11 @@ test('admin API: Spotify app card saves, never returns the secret, and login use
     source: 'admin',
     redirectUri: `${ORIGIN}/spotify/callback`
   });
-  assert.deepEqual(before.setup.discordApp, { applicationId: '1001', userId: '42' });
+  assert.deepEqual(before.setup.discordApp, {
+    applicationId: '1001',
+    userId: '42',
+    installUrl: 'https://discord.com/oauth2/authorize?client_id=1001&integration_type=1&scope=applications.commands'
+  });
   assert.equal(before.setup.publicBaseUrl, ORIGIN);
   assert.equal(before.discordClientId, '1001');
 

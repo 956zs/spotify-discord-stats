@@ -175,6 +175,7 @@ export const MESSAGES = {
     'status.discordApp': 'Discord app',
     'status.discordAppValue': '{app}（DM 和 widget 給 {user}）',
     'status.discordAppMissing': '從 bot token 讀不到 app，請檢查 DISCORD_TOKEN',
+    'status.discordInstall': '加到我的應用程式（收不到 DM 時）',
     'setup.title': 'Spotify app',
     'setup.hint': '連結 Spotify 前要先建一個自己的 Spotify app，把它的 Client ID 和 Client Secret 貼到這裡。',
     'setup.step1': '打開 Spotify Developer Dashboard，按 Create app。名稱和說明隨便填。',
@@ -260,13 +261,29 @@ export const MESSAGES = {
     'err.invalid_spotify_app': 'Client ID 和 Client Secret 都是 32 個英數字，請再檢查一次',
     'err.spotify_app_rejected': 'Spotify 說這組 Client ID 或 Client Secret 不對',
     'err.spotify_app_from_cloudflare': 'Spotify app 設定在 Cloudflare，這裡不能改',
+    'err.discord_app_unknown': '從 DISCORD_TOKEN 讀不到 Discord app',
+    'err.login_link_too_soon': '剛剛才寄過登入連結，請等一分鐘',
+    'err.login_link_dm_failed': 'bot 沒辦法私訊你',
     'err.http': 'HTTP {status}',
     'err.network': '連不上伺服器',
 
     // Login page
-    'login.hint': '輸入部署時設定的 ADMIN_TOKEN。',
+    'login.hint': '用 Discord bot 私訊給你的連結登入。',
+    'login.step1': '先把這個 app 加到你的 Discord 帳號（只要做一次），bot 才能私訊你。',
+    'login.install': '加到我的應用程式',
+    'login.step2': '讓 bot 私訊你一個登入連結。',
+    'login.sendLink': '寄登入連結給我',
+    'login.dmNote': '連結 10 分鐘內有效，只能用一次。',
+    'login.or': '或用 ADMIN_TOKEN 登入',
     'login.submit': '登入',
-    'login.failed': 'Token 不正確'
+    'login.confirmHint': '按下面的按鈕登入 admin 頁。',
+    'login.confirm': '登入',
+    'login.notice.failed': 'Token 不正確',
+    'login.notice.sent': '已寄出，去 Discord 私訊點連結。',
+    'login.notice.tooSoon': '剛剛才寄過，請等一分鐘再試。',
+    'login.notice.dmFailed': 'bot 沒辦法私訊你。先按上面的「加到我的應用程式」，或確認你跟 bot 在同一個伺服器而且允許私訊。',
+    'login.notice.expired': '這個連結已經失效（用過、過期或被新的連結取代），請再寄一次。',
+    'login.notice.noApp': '從 DISCORD_TOKEN 讀不到 Discord app，請到 Cloudflare 檢查這個 secret。'
   },
   en: {
     // Page title, header bar (language switch, sign-in state, status pills)
@@ -433,6 +450,7 @@ export const MESSAGES = {
     'status.discordApp': 'Discord app',
     'status.discordAppValue': '{app} (DMs and widget go to {user})',
     'status.discordAppMissing': 'Could not read the app from the bot token; check DISCORD_TOKEN',
+    'status.discordInstall': 'Add to My Apps (if DMs do not arrive)',
     'setup.title': 'Spotify app',
     'setup.hint': 'Before connecting Spotify, create your own Spotify app and paste its Client ID and Client Secret here.',
     'setup.step1': 'Open the Spotify Developer Dashboard and click Create app. Any name and description work.',
@@ -518,18 +536,38 @@ export const MESSAGES = {
     'err.invalid_spotify_app': 'The Client ID and Client Secret are both 32 letters and digits; check them again',
     'err.spotify_app_rejected': 'Spotify says this Client ID or Client Secret is wrong',
     'err.spotify_app_from_cloudflare': 'The Spotify app is set in Cloudflare and cannot be changed here',
+    'err.discord_app_unknown': 'Could not read the Discord app from DISCORD_TOKEN',
+    'err.login_link_too_soon': 'A sign-in link was sent less than a minute ago; wait a minute',
+    'err.login_link_dm_failed': 'The bot could not DM you',
     'err.http': 'HTTP {status}',
     'err.network': 'Could not reach the server',
 
     // Login page
-    'login.hint': 'Enter the ADMIN_TOKEN you set when deploying.',
+    'login.hint': 'Sign in with a link your Discord bot sends you.',
+    'login.step1': 'Add this app to your Discord account (only once), so the bot can DM you.',
+    'login.install': 'Add to My Apps',
+    'login.step2': 'Get a sign-in link in your DMs.',
+    'login.sendLink': 'Send me a sign-in link',
+    'login.dmNote': 'The link works once, for 10 minutes.',
+    'login.or': 'or sign in with ADMIN_TOKEN',
     'login.submit': 'Sign in',
-    'login.failed': 'Wrong token'
+    'login.confirmHint': 'Click the button to sign in to the admin page.',
+    'login.confirm': 'Sign in',
+    'login.notice.failed': 'Wrong token',
+    'login.notice.sent': 'Sent. Open the link in your Discord DMs.',
+    'login.notice.tooSoon': 'A link was sent less than a minute ago. Try again in a minute.',
+    'login.notice.dmFailed': 'The bot could not DM you. Add the app with the button above first, or share a server with the bot that allows DMs.',
+    'login.notice.expired': 'This link no longer works (used, expired or replaced by a newer one). Send a new one.',
+    'login.notice.noApp': 'Could not read the Discord app from DISCORD_TOKEN. Check this secret in Cloudflare.'
   }
 };
 
 // Keys the login page needs; only these are sent with it.
-export const LOGIN_KEYS = ['doc.title', 'lang.label', 'login.hint', 'login.submit', 'login.failed'];
+export const LOGIN_KEYS = [
+  'doc.title',
+  'lang.label',
+  ...Object.keys(MESSAGES[DEFAULT_LANGUAGE]).filter((key) => key.startsWith('login.'))
+];
 
 export function isLanguage(value) {
   return LANGUAGES.includes(value);
