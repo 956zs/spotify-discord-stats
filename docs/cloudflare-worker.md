@@ -16,8 +16,9 @@ What runs on Cloudflare:
 
 Cloudflare Tunnel and local ports are not needed for this deployment target.
 
-Discord DMs only work if the bot shares a server with the target Discord user
-and that user allows DMs. If DMs fail, Spotify authorization and sync still
+Discord DMs only work if the target user added the app to their account (user
+install, the **Add to My Apps** link) or shares a server with the bot, and
+allows DMs from it. If DMs fail, Spotify authorization and sync still
 continue; the Worker logs the failure and skips the notification.
 
 Spotify artist genre enrichment is disabled because Spotify artist genre
@@ -44,8 +45,8 @@ With the Deploy to Cloudflare button (no local tools needed):
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/956zs/spotify-discord-stats)
 
 Cloudflare copies the repo into your GitHub (or GitLab) account, creates the
-D1 database, asks for `DISCORD_TOKEN` and `ADMIN_TOKEN` (the names come from
-[.dev.vars.example](../.dev.vars.example), the descriptions from
+D1 database, asks for `DISCORD_TOKEN` (the name comes from
+[.dev.vars.example](../.dev.vars.example), the description from
 `cloudflare.bindings` in [package.json](../package.json)), and runs
 `npm run deploy`. Later pushes to that repo build and deploy again through
 Workers Builds.
@@ -57,12 +58,13 @@ npm install
 npx wrangler login
 npm run deploy
 npx wrangler secret put DISCORD_TOKEN
-npx wrangler secret put ADMIN_TOKEN
 ```
 
 Then, in both cases:
 
-1. Open `https://YOUR_WORKER_URL/admin` and sign in with `ADMIN_TOKEN`.
+1. Open `https://YOUR_WORKER_URL/admin`, click **Add to My Apps** once, then
+   **Send me a sign-in link** and open the link the bot DMs you (see
+   [Signing in](#signing-in)).
 2. On the **Status** tab, create a Spotify app with the Redirect URI shown in
    the **Spotify app** panel, paste its Client ID and Client Secret, and click
    **Save and check**.
@@ -109,18 +111,51 @@ The D1 scripts address the database by its binding name `DB`, so they work
 whatever the database itself is called. Plain `npx wrangler ...` reads
 `wrangler.toml` only.
 
-## Required secrets
+## Required secret
 
 | Name | What it is |
 | --- | --- |
-| `DISCORD_TOKEN` | Discord bot token (Developer Portal → your app → **Bot** → **Reset Token**). |
-| `ADMIN_TOKEN` | Admin password. Protects `/admin`, `/spotify/login`, and the `/admin/*` routes. Use a random string of at least 32 characters. |
+| `DISCORD_TOKEN` | Discord bot token (Developer Portal → your app → **Bot** → **Reset Token**). The app, its owner, and the sign-in DMs all come from it. |
 
-Set them with the Deploy button form, `npx wrangler secret put NAME`, or in
-the Cloudflare dashboard (your Worker → **Settings** →
-**Variables and Secrets**). The settings page signs in once with
-`ADMIN_TOKEN` and keeps a session cookie; the other routes also accept
-`?token=`.
+Set it with the Deploy button form, `npx wrangler secret put DISCORD_TOKEN`, or
+in the Cloudflare dashboard (your Worker → **Settings** →
+**Variables and Secrets**). `ADMIN_TOKEN` is optional, see
+[Signing in](#signing-in).
+
+## Signing in
+
+`/admin`, `/spotify/login`, and the `/admin/*` routes need a signed-in
+session ([worker/lib/login-link.js](../worker/lib/login-link.js),
+[worker/lib/admin-auth.js](../worker/lib/admin-auth.js)):
+
+- The sign-in page has an **Add to My Apps** button: the user-install link
+  `https://discord.com/oauth2/authorize?client_id=<app>&integration_type=1&scope=applications.commands`.
+  It adds the app to your own Discord account, so the bot can DM you without
+  sharing a server. It is only needed once. The app's **Installation** page in
+  the Developer Portal must have **User Install** ticked (the default for new
+  apps). The **Discord app** row on the Status tab has the same link.
+- **Send me a sign-in link** makes the bot DM a one-time link
+  (`/admin/login/link?t=...`) to the user the DMs go to (`DISCORD_USER_ID`,
+  or `DISCORD_REMINDER_USER_ID` when set). The link works once, for 10
+  minutes; only the newest link works, and a new one can be sent at most once
+  a minute. Only a hash of it is stored. Opening it shows a page with a
+  **Sign in** button (link previews only fetch the page, so they cannot use
+  the link up); clicking it sets a 30-day session cookie.
+- If the DM cannot be sent, add the app with **Add to My Apps**, or add the bot
+  to a server you are in (**OAuth2** → **URL Generator** → `bot` scope) that
+  allows DMs from members.
+
+Without `ADMIN_TOKEN`, sessions are signed with a random key the Worker creates
+once and keeps in D1 (`admin_session_key`). Deleting that row signs every
+session out.
+
+`ADMIN_TOKEN` (optional secret, a random string of at least 32 characters)
+adds password sign-in: the sign-in page then also shows a password form under
+**or sign in with ADMIN_TOKEN**, the routes accept `?token=YOUR_ADMIN_TOKEN`, and
+the Spotify reminder DM links straight to `/spotify/login?token=...`. When it is
+set, it is also the session signing key, so rotating it signs everyone out.
+Without it, `?token=` links do not work and the reminder DM links to
+`/admin#status` instead.
 
 You do not need `SPOTIFY_REFRESH_TOKEN`. The Worker stores the refresh token in
 D1 after **Reconnect Spotify**.
@@ -136,7 +171,7 @@ The settings that used to be required `[vars]` are now found at runtime
   so a new token is looked up again.
 - `PUBLIC_BASE_URL`: the `https` origin the admin page was last opened on
   while signed in. The cron run, which has no request, uses the stored value
-  for uploaded hero image URLs and the reconnect link in reminder DMs. Before
+  for uploaded hero image URLs and the link in reminder DMs. Before
   the admin page has been opened once, reminder DMs say to open the admin page
   instead of linking to it.
 - `SPOTIFY_REDIRECT_URI`: `PUBLIC_BASE_URL` + `/spotify/callback`. Because it
@@ -160,7 +195,8 @@ existing setups keep working unchanged. Set these as `[vars]` in
 | --- | --- | --- |
 | `DISCORD_CLIENT_ID` | the bot token's application | Application that owns the widget. |
 | `DISCORD_USER_ID` | the application's owner | User whose widget is updated and who gets the DMs. |
-| `DISCORD_REMINDER_USER_ID` | `DISCORD_USER_ID` | Send DMs to this user instead. |
+| `ADMIN_TOKEN` | not set | Secret. Enables password sign-in and `?token=` links; also the session signing key, so rotating it signs everyone out. See [Signing in](#signing-in). |
+| `DISCORD_REMINDER_USER_ID` | `DISCORD_USER_ID` | Send DMs (including sign-in links) to this user instead. |
 | `DISCORD_IDENTITY_ID` | `0` | Identity in the widget PATCH URL, see [discord-widget.md](discord-widget.md#how-the-worker-updates-the-widget). |
 | `PUBLIC_BASE_URL` | last admin page origin | Public `https` origin of the Worker. |
 | `SPOTIFY_REDIRECT_URI` | `PUBLIC_BASE_URL/spotify/callback` | When set, its origin is also used as `PUBLIC_BASE_URL` if that is not set. |
@@ -185,9 +221,12 @@ secret, or put it in the Wrangler config.
 | `public_base_url` | Last `https` origin the admin page was opened on |
 | `spotify_client_id` | Spotify Client ID from the admin page |
 | `spotify_client_secret` | Spotify Client Secret from the admin page |
+| `admin_session_key` | Session signing key, only used when `ADMIN_TOKEN` is not set |
+| `admin_login_link` | JSON with the hash and expiry of the newest sign-in link, and when it was sent |
 
 The Spotify Client Secret is stored in D1 like the Spotify refresh token
-(`spotify_refresh_token`). Treat D1 exports and backups as secret data.
+(`spotify_refresh_token`) and the session signing key. Treat D1 exports and
+backups as secret data.
 
 ## D1 migrations
 
@@ -214,19 +253,23 @@ From your own machine: `git pull` (or download the new version),
 
 Setups made before the Deploy button had an untracked `wrangler.toml`. Rename
 it to `wrangler.local.toml` before `git pull`, since `wrangler.toml` is now
-tracked. Its `[vars]` and the existing secrets keep working.
+tracked. Its `[vars]` and the existing secrets keep working, including
+`ADMIN_TOKEN` and password sign-in.
 
 ## Manual Admin Routes
 
+These work with a signed-in session. With `ADMIN_TOKEN` set, they also accept
+`?token=YOUR_ADMIN_TOKEN`:
+
 ```text
-GET /admin                      (settings page, sign in with ADMIN_TOKEN)
-GET /spotify/login?token=YOUR_ADMIN_TOKEN
-GET /admin/sync?token=YOUR_ADMIN_TOKEN
-GET /admin/stats?token=YOUR_ADMIN_TOKEN
-POST /admin/recap/weekly/send?token=YOUR_ADMIN_TOKEN
-POST /admin/recap/monthly/send?token=YOUR_ADMIN_TOKEN
-POST /admin/recap/monthly/send?token=YOUR_ADMIN_TOKEN&month=2026-06
-GET /health
+GET /admin                      (settings page)
+GET /spotify/login
+GET /admin/sync
+GET /admin/stats
+POST /admin/recap/weekly/send
+POST /admin/recap/monthly/send
+POST /admin/recap/monthly/send?month=2026-06
+GET /health                     (no sign-in)
 ```
 
 `/spotify/login` redirects to `/admin#status` while the Spotify app is not set
@@ -241,7 +284,9 @@ configured local send time matches Monday 09:00 or the 1st day of the month at
 ## Local development
 
 Copy [.dev.vars.example](../.dev.vars.example) to `.dev.vars` and fill in
-`DISCORD_TOKEN` and `ADMIN_TOKEN`. Enter the Spotify app on the admin page, or
+`DISCORD_TOKEN`. The DM sign-in link works with the local address too; add
+`ADMIN_TOKEN` to sign in with a password instead. Enter the Spotify app on the
+admin page, or
 add `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` to `.dev.vars`. Then:
 
 ```bash

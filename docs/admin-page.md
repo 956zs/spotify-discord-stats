@@ -1,7 +1,24 @@
 # Admin Page
 
-Open `https://YOUR_WORKER_URL/admin` and sign in with your `ADMIN_TOKEN`.
-Settings are saved in the database and take effect without a redeploy.
+Open `https://YOUR_WORKER_URL/admin` and sign in. Settings are saved in the
+database and take effect without a redeploy.
+
+## Signing in
+
+The sign-in page has two steps:
+
+1. **Add to My Apps** (加到我的應用程式) adds the app to your Discord account
+   (user install), so the bot can DM you without sharing a server. Only needed
+   once.
+2. **Send me a sign-in link** (寄登入連結給我): the bot DMs you a one-time link.
+   It works once, for 10 minutes, only the newest link works, and a new one
+   can be sent at most once a minute. The link opens a page with a
+   **Sign in** (登入) button; clicking it signs you in for 30 days.
+
+If `ADMIN_TOKEN` is set, the page also shows a password form under
+**or sign in with ADMIN_TOKEN** (或用 ADMIN_TOKEN 登入). Messages on the page
+explain a failed DM, a link sent less than a minute ago, and a link that no
+longer works. Details: [cloudflare-worker.md](cloudflare-worker.md#signing-in).
 
 ![Admin page](images/admin.png)
 
@@ -79,7 +96,9 @@ DMs and widget go to (`DISCORD_CLIENT_ID` and `DISCORD_USER_ID`, read from the
 bot token unless set in Cloudflare; see
 [cloudflare-worker.md](cloudflare-worker.md#what-the-worker-fills-in-by-itself)).
 If the app cannot be read from the bot token, the row says
-**Could not read the app from the bot token; check DISCORD_TOKEN**.
+**Could not read the app from the bot token; check DISCORD_TOKEN**. Next to
+the app, an **Add to My Apps (if DMs do not arrive)** (加到我的應用程式（收不到
+DM 時）) link opens the same user-install link as the sign-in page.
 
 ## What you can change
 
@@ -153,8 +172,9 @@ Recently Played rows carry track length rather than time actually listened.
 Saved settings live in D1 (`app_state.admin_settings`) and override
 [config/app.json](../config/app.json) and
 [config/widget.json](../config/widget.json), which stay as the defaults.
-Signing in sets a 30-day session cookie signed with `ADMIN_TOKEN`, so changing
-the token signs every session out.
+Signing in sets a 30-day session cookie. It is signed with `ADMIN_TOKEN` when
+that is set (changing the token signs every session out), otherwise with a
+random key kept in D1 (`app_state.admin_session_key`).
 
 Only the queries the chosen slots need are run, once per distinct range.
 Results are cached per range and reused until a play is added, the hour
@@ -175,11 +195,11 @@ migration `0005`.
 
 ## Admin routes
 
-All of these need `ADMIN_TOKEN`, either signed in through `/admin` or as
-`?token=YOUR_ADMIN_TOKEN`:
+All of these need a signed-in session from `/admin`, or, when `ADMIN_TOKEN` is
+set, `?token=YOUR_ADMIN_TOKEN`:
 
 ```text
-GET  /admin                        settings page
+GET  /admin                        settings page (the sign-in page when signed out)
 GET  /spotify/login                connect or reconnect Spotify
 GET  /admin/sync                   sync now
 GET  /admin/stats                  stats as JSON
@@ -188,6 +208,17 @@ POST /admin/recap/monthly/send     send last month's recap DM now (add &month=20
 ```
 
 The recap routes send real Discord DMs; they are not previews.
+
+The sign-in routes need no session. The POSTs are same-origin form posts from
+the sign-in page:
+
+```text
+POST /admin/login/link             send a sign-in link by DM (at most once a minute)
+GET  /admin/login/link?t=...       page with the Sign in button for that link
+POST /admin/login/confirm          use the link (form field t) and sign in
+POST /admin/login                  sign in with ADMIN_TOKEN (form field token; only works when ADMIN_TOKEN is set)
+POST /admin/logout                 sign out
+```
 
 The page itself uses these JSON routes (signed-in session, same-origin only):
 
@@ -219,7 +250,7 @@ WebP and GIF files are stored.
 ```json
 {
   "spotifyApp": { "clientId": "…", "hasSecret": true, "configured": true, "source": "admin", "redirectUri": "https://…/spotify/callback" },
-  "discordApp": { "applicationId": "…", "userId": "…" },
+  "discordApp": { "applicationId": "…", "userId": "…", "installUrl": "https://discord.com/oauth2/authorize?…" },
   "publicBaseUrl": "https://…"
 }
 ```

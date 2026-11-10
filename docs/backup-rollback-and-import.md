@@ -261,7 +261,8 @@ run. Rows that already existed before the import are not deleted.
 ## After Import
 
 When Spotify API access is working, force one sync to refresh stats and patch the
-Discord widget:
+Discord widget: click **Sync now** on the admin page's **Status** tab. If you set
+`ADMIN_TOKEN`, this also works from a terminal:
 
 ```bash
 curl -fsS "https://YOUR_WORKER_URL/admin/sync?token=YOUR_ADMIN_TOKEN"
