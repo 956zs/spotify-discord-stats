@@ -1,7 +1,7 @@
 import { appConfig } from '../config.js';
 import { MS_PER_DAY } from '../../shared/time.js';
 import { trySendDiscordDm } from './discord.js';
-import { requiredEnv } from './env.js';
+import { publicBaseUrl, requiredEnv } from './env.js';
 import { getSpotifyRefreshTokenIssuedAt } from './spotify.js';
 import { getState, setState } from './state.js';
 
@@ -56,11 +56,14 @@ function tokenReminderMessage(daysLeft, expiresAt, env) {
 }
 
 function reauthorizeText(env) {
-  return `Authorize here: ${getSpotifyLoginUrl(env)}`;
+  const baseUrl = publicBaseUrl(env);
+  if (!baseUrl) {
+    return 'Open your admin page and click Reconnect Spotify on the Status tab.';
+  }
+  return `Authorize here: ${getSpotifyLoginUrl(env, baseUrl)}`;
 }
 
-function getSpotifyLoginUrl(env) {
-  const baseUrl = env.PUBLIC_BASE_URL || new URL(env.SPOTIFY_REDIRECT_URI).origin;
+function getSpotifyLoginUrl(env, baseUrl) {
   const url = new URL('/spotify/login', baseUrl);
   url.searchParams.set('token', requiredEnv(env, 'ADMIN_TOKEN'));
   return url.toString();

@@ -17,7 +17,10 @@ export const ERROR_CODES = Object.freeze({
   spotifyTokenFailed: 'spotify_token_failed',
   spotifyRateLimited: 'spotify_rate_limited',
   spotifyApiFailed: 'spotify_api_failed',
-  discordDmFailed: 'discord_dm_failed'
+  discordDmFailed: 'discord_dm_failed',
+  invalidSpotifyApp: 'invalid_spotify_app',
+  spotifyAppRejected: 'spotify_app_rejected',
+  spotifyAppFromCloudflare: 'spotify_app_from_cloudflare'
 });
 
 export class HttpError extends Error {

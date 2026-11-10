@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { handleRequest } from '../worker/app.js';
+import { publicBaseUrl } from '../worker/lib/env.js';
+import { withRuntimeConfig } from '../worker/lib/runtime-config.js';
+import { getWidgetData } from '../worker/lib/stats.js';
+import { buildWidgetPayload } from '../worker/lib/widget.js';
 import { getDefaultSettings, saveSettings } from '../worker/lib/settings.js';
 import { readFileSync } from 'node:fs';
 import { HERO_TEMPLATE_PATH, heroTemplateBytes } from '../worker/lib/hero-template.js';
@@ -168,23 +172,31 @@ test('upload mode payload points at the versioned public URL until the image is 
   assert.equal(again.deleted, false);
 });
 
-test('upload mode without PUBLIC_BASE_URL or SPOTIFY_REDIRECT_URI acts like asset', async () => {
+test('without PUBLIC_BASE_URL the admin origin is remembered for the widget image', async () => {
   const env = createEnv({ PUBLIC_BASE_URL: undefined });
-  const cookie = await login(env);
+  const heroField = (payload) => payload.data.dynamic.find((field) => field.name === 'hero_image');
   const settings = getDefaultSettings();
   settings.widget.heroImage = 'upload';
   await saveSettings(env.DB, settings);
+
+  // Before any signed-in visit, the cron run knows no public URL: upload acts like asset.
+  const before = await withRuntimeConfig(env);
+  assert.equal(publicBaseUrl(before), null);
+  const beforeData = await getWidgetData(env.DB, settings, { publicBaseUrl: publicBaseUrl(before) });
+  assert.equal(buildWidgetPayload(beforeData, settings).data.dynamic.some((field) => field.name === 'hero_image'), false);
+
+  const cookie = await login(env);
   await handleRequest(upload(PNG, 'image/png', { Cookie: cookie }), env);
   const state = await adminState(env, cookie);
-  assert.equal(state.heroImage.publicBaseUrl, null);
-  assert.equal(state.payload.data.dynamic.some((field) => field.name === 'hero_image'), false);
+  assert.equal(state.heroImage.publicBaseUrl, ORIGIN);
+  assert.match(heroField(state.payload).value.url, /^https:\/\/stats\.example\.test\/widget\/hero\?v=/);
+
+  // The cron run now uses the remembered origin.
+  assert.equal(publicBaseUrl(await withRuntimeConfig(env)), ORIGIN);
 
   const withRedirect = { ...env, SPOTIFY_REDIRECT_URI: 'https://other.example.test/spotify/callback' };
   const redirected = await adminState(withRedirect, cookie);
-  assert.match(
-    redirected.payload.data.dynamic.find((field) => field.name === 'hero_image').value.url,
-    /^https:\/\/other\.example\.test\/widget\/hero\?v=/
-  );
+  assert.match(heroField(redirected.payload).value.url, /^https:\/\/other\.example\.test\/widget\/hero\?v=/);
 });
 
 test('album mode uses the last played album artwork from D1', async () => {

@@ -15,6 +15,13 @@ import {
 import { adminPageResponse, loginPageResponse } from './lib/admin-page.js';
 import { pickLanguage } from './lib/admin/i18n.js';
 import { publicBaseUrl } from './lib/env.js';
+import {
+  discordAppStatus,
+  rememberPublicOrigin,
+  saveSpotifyApp,
+  spotifyAppStatus,
+  withRuntimeConfig
+} from './lib/runtime-config.js';
 import { HERO_TEMPLATE_PATH, heroTemplateResponse } from './lib/hero-template.js';
 import { ERROR_CODES, HttpError, json } from './lib/http.js';
 import { startSpotifyLogin, handleSpotifyCallback } from './lib/oauth.js';
@@ -35,7 +42,7 @@ import {
   widgetImageResponse
 } from './lib/widget-images.js';
 
-export async function handleRequest(request, env) {
+export async function handleRequest(request, rawEnv) {
   const url = new URL(request.url);
 
   if (url.pathname === '/health') {
@@ -47,7 +54,7 @@ export async function handleRequest(request, env) {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       throw new HttpError('method not allowed', 405, ERROR_CODES.methodNotAllowed);
     }
-    return widgetImageResponse(env.DB, HERO_IMAGE_KEY, request);
+    return widgetImageResponse(rawEnv.DB, HERO_IMAGE_KEY, request);
   }
 
   // Public: the hero size template is just a guide image, no secrets.
@@ -56,21 +63,29 @@ export async function handleRequest(request, env) {
   }
 
   if (url.pathname === '/spotify/login') {
-    await requireAdmin(request, url, env);
+    const env = await adminEnv(request, url, rawEnv);
+    if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) {
+      // Not set up yet: the Status tab has the form for the Spotify app.
+      return redirect('/admin#status');
+    }
     return startSpotifyLogin(env);
   }
 
   if (url.pathname === '/spotify/callback') {
-    return handleSpotifyCallback(url, env);
+    return handleSpotifyCallback(url, await withRuntimeConfig(rawEnv, { requestOrigin: url.origin }));
   }
 
   if (url.pathname === '/admin' || url.pathname === '/admin/') {
     const lang = pickLanguage(request.headers.get('Accept-Language'));
-    return (await isAdminRequest(request, url, env)) ? adminPageResponse(lang) : loginPageResponse(200, false, lang);
+    if (!(await isAdminRequest(request, url, rawEnv))) {
+      return loginPageResponse(200, false, lang);
+    }
+    await rememberPublicOrigin(rawEnv, url.origin);
+    return adminPageResponse(lang);
   }
 
   if (url.pathname === '/admin/login') {
-    return handleLogin(request, url, env);
+    return handleLogin(request, url, rawEnv);
   }
 
   if (url.pathname === '/admin/logout') {
@@ -79,17 +94,17 @@ export async function handleRequest(request, env) {
   }
 
   if (url.pathname.startsWith('/admin/api/')) {
-    await requireAdmin(request, url, env);
-    return handleAdminApi(request, url, env);
+    const env = await adminEnv(request, url, rawEnv);
+    return handleAdminApi(request, url, env, rawEnv);
   }
 
   if (url.pathname === '/admin/sync') {
-    await requireAdmin(request, url, env);
+    const env = await adminEnv(request, url, rawEnv);
     return json(await syncOnce(env, { forcePatch: true, refreshStats: true, includeStatsRanges: true }));
   }
 
   if (url.pathname === '/admin/stats') {
-    await requireAdmin(request, url, env);
+    const env = await adminEnv(request, url, rawEnv);
     const settings = await loadSettings(env.DB);
     const stats = await getStats(env.DB, settings.statsDays);
     const statsRanges = await getStatsRanges(env.DB, appConfig.statsRangeDays);
@@ -98,20 +113,21 @@ export async function handleRequest(request, env) {
 
   if (url.pathname === '/admin/recap/weekly/send') {
     requirePost(request);
-    await requireAdmin(request, url, env);
+    const env = await adminEnv(request, url, rawEnv);
     return json(await sendWeeklyRecap(env));
   }
 
   if (url.pathname === '/admin/recap/monthly/send') {
     requirePost(request);
-    await requireAdmin(request, url, env);
+    const env = await adminEnv(request, url, rawEnv);
     return json(await sendMonthlyRecap(env, { month: url.searchParams.get('month') }));
   }
 
   return json({ error: 'not found', code: ERROR_CODES.notFound }, 404);
 }
 
-export async function handleScheduled(env, now = new Date()) {
+export async function handleScheduled(rawEnv, now = new Date()) {
+  const env = await withRuntimeConfig(rawEnv);
   // A failed sync (e.g. Spotify is down or needs reauthorizing) must not skip the reminder and recaps;
   // it is rethrown at the end so the cron run still shows as failed.
   let syncError = null;
@@ -138,6 +154,14 @@ export async function handleScheduled(env, now = new Date()) {
   }
 }
 
+// Signed-in requests: check the admin token, remember the origin the admin uses,
+// then fill in the settings derived at runtime (see runtime-config.js).
+async function adminEnv(request, url, rawEnv) {
+  await requireAdmin(request, url, rawEnv);
+  await rememberPublicOrigin(rawEnv, url.origin);
+  return withRuntimeConfig(rawEnv, { requestOrigin: url.origin });
+}
+
 async function handleLogin(request, url, env) {
   requirePost(request);
   requireSameOrigin(request, url);
@@ -149,7 +173,7 @@ async function handleLogin(request, url, env) {
   return redirect('/admin', await createSessionCookie(env));
 }
 
-async function handleAdminApi(request, url, env) {
+async function handleAdminApi(request, url, env, rawEnv) {
   if (url.pathname === '/admin/api/state' && request.method === 'GET') {
     const settings = await loadSettings(env.DB);
     const data = await getWidgetData(env.DB, settings, { publicBaseUrl: publicBaseUrl(env) });
@@ -164,7 +188,8 @@ async function handleAdminApi(request, url, env) {
       // Public application id, used to link to this app's widget editor.
       discordClientId: env.DISCORD_CLIENT_ID || null,
       recapSchedule: recapSchedule(),
-      status: await adminStatus(env)
+      status: await adminStatus(env),
+      setup: await setupStatus(env, rawEnv)
     });
   }
 
@@ -181,6 +206,12 @@ async function handleAdminApi(request, url, env) {
 
   requireSameOriginJson(request, url);
   const body = await readJson(request);
+
+  if (url.pathname === '/admin/api/spotify-app') {
+    const { changedApp } = await saveSpotifyApp(rawEnv, body);
+    const resolved = await withRuntimeConfig(rawEnv, { requestOrigin: url.origin });
+    return json({ changedApp, setup: await setupStatus(resolved, rawEnv) });
+  }
 
   if (url.pathname === '/admin/api/hero-image/delete') {
     const { deleted } = await deleteWidgetImage(env.DB, HERO_IMAGE_KEY);
@@ -206,6 +237,14 @@ async function handleAdminApi(request, url, env) {
   }
 
   return json({ error: 'not found', code: ERROR_CODES.notFound }, 404);
+}
+
+async function setupStatus(env, rawEnv) {
+  return {
+    spotifyApp: await spotifyAppStatus(rawEnv, env),
+    discordApp: discordAppStatus(env),
+    publicBaseUrl: publicBaseUrl(env)
+  };
 }
 
 async function heroImageState(env) {
@@ -268,10 +307,11 @@ async function readJson(request) {
 }
 
 function redirect(location, cookie) {
-  return new Response(null, {
-    status: 303,
-    headers: { Location: location, 'Set-Cookie': cookie, 'Cache-Control': 'no-store' }
-  });
+  const headers = { Location: location, 'Cache-Control': 'no-store' };
+  if (cookie) {
+    headers['Set-Cookie'] = cookie;
+  }
+  return new Response(null, { status: 303, headers });
 }
 
 function requirePost(request) {
