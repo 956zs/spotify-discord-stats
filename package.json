@@ -42,10 +42,7 @@
   "cloudflare": {
     "bindings": {
       "DISCORD_TOKEN": {
-        "description": "Your Discord bot token: [Developer Portal](https://discord.com/developers/applications) → your app → **Bot** → **Reset Token**. The app ID and your user ID are read from it."
-      },
-      "ADMIN_TOKEN": {
-        "description": "Password for the admin page (`/admin`). Make up a random string of at least 32 characters, for example with a password manager, and keep it."
+        "description": "Your Discord bot token: [Developer Portal](https://discord.com/developers/applications) → your app → **Bot** → **Reset Token**. The app ID and your user ID are read from it, and the bot DMs you the sign-in link for the admin page."
       }
     }
   }

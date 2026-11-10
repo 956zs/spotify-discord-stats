@@ -1,2 +1,1 @@
 DISCORD_TOKEN= # Discord bot token (Developer Portal -> your app -> Bot -> Reset Token)
-ADMIN_TOKEN= # Admin page password: make up a random string of at least 32 characters
